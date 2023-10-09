@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css?family=Sancreek|Crete+Round|Graduate|Leckerli+One|Passion+One|Rowdies');
+@import url('https://fonts.googleapis.com/css?family=Bowlby+One+SC|Sancreek|Crete+Round|Graduate|Leckerli+One|Passion+One|Rowdies');
 
 body {
 	font-family: 'Sancreek', cursive;
@@ -58,6 +58,11 @@ body {
 .sf_title{
 	font-family: "Passion One", sans-serif;
 	background:#4283C7;
+}
+
+.rf_title{
+	font-family: 'Bowlby One SC', sans-serif;
+	background:#c6011f;
 }
 
 .title {
