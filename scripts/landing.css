@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css?family=Archivo+Black|Lato:wght@900|Bowlby+One+SC|Sancreek|Crete+Round|Graduate|Leckerli+One|Passion+One|Rowdies');
+@import url('https://fonts.googleapis.com/css?family=Archivo+Black|Lato:900|Bowlby+One+SC|Sancreek|Crete+Round|Graduate|Leckerli+One|Passion+One|Rowdies');
 
 body {
 	font-family: 'Sancreek', cursive;
@@ -67,6 +67,7 @@ body {
 
 .we_title{
 	font-family: 'Lato', sans-serif;
+	font-weight: 900;
 	background:#0f7173
 }
 
