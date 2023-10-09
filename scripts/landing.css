@@ -3,7 +3,7 @@
 body {
 	font-family: 'Sancreek', cursive;
 	color: white;
-	background-image: url("/images/home-15646.jpg");
+	background-image: url("../images/home-15646.jpg");
 	background-repeat: no-repeat;
 	background-attachment: fixed;
 	background-position: center bottom;	
