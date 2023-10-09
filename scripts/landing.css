@@ -1,0 +1,116 @@
+@import url('https://fonts.googleapis.com/css?family=Sancreek|Crete+Round|Graduate|Leckerli+One|Passion+One');
+
+body {
+	font-family: 'Sancreek', cursive;
+	color: white;
+	background-image: url("../images/home-15646.jpg");
+	background-repeat: no-repeat;
+	background-attachment: fixed;
+	background-position: center bottom;	
+}
+
+.header {
+	text-align:center;
+	width:100%;
+	font-size:3em;
+	-webkit-text-stroke: 1px black;
+	text-shadow:
+    2px 2px 0 #000,
+    /* Simulated effect for Firefox and Opera
+       and nice enhancement for WebKit */
+   -1px -1px 0 #000,  
+    1px -1px 0 #000,
+   -1px  1px 0 #000,
+    1px  1px 0 #000;
+}
+
+.fitText {
+	-webkit-text-stroke: 1px black;
+	text-shadow:
+    2px 2px 0 #000,
+    /* Simulated effect for Firefox and Opera
+       and nice enhancement for WebKit */
+   -1px -1px 0 #000,  
+    1px -1px 0 #000,
+   -1px  1px 0 #000,
+    1px  1px 0 #000;
+}
+
+.pg_title{
+	font-family: 'Crete Round', sans-serif;
+	background:#2E790D;
+}
+
+.cm_title{
+	font-family: 'Graduate', sans-serif;
+	background:#f90e24;
+}
+
+.jm_title{
+	font-family: "Leckerli One", sans-serif;
+	background:#103959;
+}
+
+.sf_title{
+	font-family: "Passion One", sans-serif;
+	background:#4283C7;
+}
+
+.title {
+	margin-bottom: 50px;
+	height:75px;
+	width:100%;
+	-moz-border-radius:20px;  
+	border-radius: 20px;  
+	-webkit-border-radius: 20px;
+	border: 2px solid white;
+	font-size:2.5em;
+	cursor: pointer;			
+}
+
+.title:hover {
+	-moz-box-shadow: 0 0 10px #fff;
+	-webkit-box-shadow: 0 0 10px #fff;
+	box-shadow: 0px 0px 10px #fff;
+}
+
+/*  SECTIONS  */
+.section {
+	clear: both;
+	padding: 0px;
+	margin: 0px;
+}
+
+/*  COLUMN SETUP  */
+.col {
+	display: block;
+	float:left;
+	margin: 1% 0 1% 1.6%;
+}
+.col:first-child { margin-left: 0; }
+
+/*  GROUPING  */
+.group:before,
+.group:after { content:""; display:table; }
+.group:after { clear:both;}
+.group { zoom:1; /* For IE 6/7 */ }
+
+/*  GRID OF FOUR  */
+.span_4_of_4 {
+	width: 100%;
+}
+.span_3_of_4 {
+	width: 74.6%;
+}
+.span_2_of_4 {
+	width: 49.2%;
+}
+.span_1_of_4 {
+	width: 23.8%;
+}
+
+/*  GO FULL WIDTH BELOW 480 PIXELS */
+@media only screen and (max-width: 480px) {
+	.col {  margin: 1% 0 1% 0%; }
+	.span_1_of_4, .span_2_of_4, .span_3_of_4, .span_4_of_4 { width: 100%; }
+}
