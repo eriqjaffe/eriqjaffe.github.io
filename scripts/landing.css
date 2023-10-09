@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css?family=Bowlby+One+SC|Sancreek|Crete+Round|Graduate|Leckerli+One|Passion+One|Rowdies');
+@import url('https://fonts.googleapis.com/css?family=Archivo+Black|Lato:wght@900|Bowlby+One+SC|Sancreek|Crete+Round|Graduate|Leckerli+One|Passion+One|Rowdies');
 
 body {
 	font-family: 'Sancreek', cursive;
@@ -63,6 +63,16 @@ body {
 .rf_title{
 	font-family: 'Bowlby One SC', sans-serif;
 	background:#c6011f;
+}
+
+.we_title{
+	font-family: 'Lato', sans-serif;
+	background:#0f7173
+}
+
+.nc_title{
+	font-family: 'Archivo Black', sans-serif;
+	background:#493548
 }
 
 .title {
