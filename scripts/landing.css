@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css?family=Archivo+Black|Lato:900|Bowlby+One+SC|Sancreek|Crete+Round|Graduate|Leckerli+One|Passion+One|Rowdies');
+@import url('https://fonts.googleapis.com/css?family=Archivo+Black|Lato:900|Bowlby+One+SC|Sancreek|Crete+Round|Graduate|Leckerli+One|Passion+One|Rowdies|Staatliches');
 
 body {
 	font-family: 'Sancreek', cursive;
@@ -74,6 +74,11 @@ body {
 .nc_title{
 	font-family: 'Archivo Black', sans-serif;
 	background:#493548
+}
+
+.lm_title{
+	font-family: 'Staatliches', sans-serif;
+	background:#103959
 }
 
 .title {
