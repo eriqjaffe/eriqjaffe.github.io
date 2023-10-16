@@ -24,7 +24,7 @@ body {
     1px  1px 0 #000;
 }
 
-.fitText {
+.fitTextRight {
 	-webkit-text-stroke: 1px black;
 	text-shadow:
     2px 2px 0 #000,
@@ -34,7 +34,44 @@ body {
     1px -1px 0 #000,
    -1px  1px 0 #000,
     1px  1px 0 #000;
+	line-height:75px; 
+	float:right; 
+	margin-right:15px;
 }
+
+.fitTextLeft {
+	-webkit-text-stroke: 1px black;
+	text-shadow:
+    2px 2px 0 #000,
+    /* Simulated effect for Firefox and Opera
+       and nice enhancement for WebKit */
+   -1px -1px 0 #000,  
+    1px -1px 0 #000,
+   -1px  1px 0 #000,
+    1px  1px 0 #000;
+	line-height:75px; 
+	float:left; 
+	margin-left:15px;
+}
+
+.imageLeft {
+	height:100px; 
+	position:relative; 
+	top:50%; 
+	margin-top:-50px; 
+	float:left; 
+	margin-left:15px;
+}
+
+.imageRight {
+	height:100px; 
+	position:relative; 
+	top:50%; 
+	margin-top:-50px; 
+	float:right; 
+	margin-right:15px;
+}
+
 .um_title{
 	font-family: 'Rowdies', sans-serif;
 	background:#103959;
@@ -82,7 +119,7 @@ body {
 }
 
 .title {
-	margin-bottom: 25px;
+	margin-bottom: 15px;
 	height:75px;
 	width:100%;
 	-moz-border-radius:20px;  
