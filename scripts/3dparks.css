@@ -10,6 +10,10 @@ body {
 	background-position: center bottom;	
 }
 
+.subtitle {
+    font-size: .8em;
+}
+
 .header {
 	text-align:center;
 	width:100%;
