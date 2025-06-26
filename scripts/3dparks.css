@@ -1,7 +1,8 @@
-@import url('https://fonts.googleapis.com/css?family=Archivo+Black|Lato:900|Bowlby+One+SC|Sancreek|Crete+Round|Graduate|Leckerli+One|Passion+One|Rowdies|Staatliches');
+/*@import url('https://fonts.googleapis.com/css?family=Barlow|Archivo+Black|Lato:900|Bowlby+One+SC|Sancreek|Crete+Round|Graduate|Leckerli+One|Passion+One|Rowdies|Staatliches');*/
+@import url('https://fonts.googleapis.com/css2?family=Cabin:ital,wght@0,400..700;1,400..700&display=swap');
 
 body {
-	font-family: 'Sancreek', cursive;
+	font-family: 'Cabin', cursive;
 	color: white;
 	background-image: url("../images/ballparkbg.jpg");
 	background-repeat: no-repeat;
@@ -13,6 +14,7 @@ body {
 	text-align:center;
 	width:100%;
 	font-size:3em;
+    font-weight: 700;
 	-webkit-text-stroke: 1px black;
 	text-shadow:
     2px 2px 0 #000,
@@ -195,4 +197,41 @@ body {
 @media only screen and (max-width: 480px) {
 	.col {  margin: 1% 0 1% 0%; }
 	.span_1_of_4, .span_2_of_4, .span_3_of_4, .span_4_of_4 { width: 100%; }
+}
+
+a {
+  color: white;
+}
+
+a:link {
+  text-decoration: none;
+}
+
+a:visited {
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+a:hover .thumb {
+    border: 1px solid #4195fc; /* some kind of blue border */
+
+    /* other CSS styles */
+
+    /* round the corners */
+    -webkit-border-radius: 4px;
+       -moz-border-radius: 4px;
+            border-radius: 4px;
+
+
+    /* make it glow! */
+    -webkit-box-shadow: 0px 0px 4px #4195fc;
+       -moz-box-shadow: 0px 0px 4px #4195fc;
+            box-shadow: 0px 0px 4px #4195fc;
+}
+
+a:active {
+  text-decoration: underline;
 }
