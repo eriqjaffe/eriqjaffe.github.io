@@ -219,8 +219,15 @@ a:hover {
   text-decoration: underline;
 }
 
+.thumb {
+    border: 2px solid transparent; /* reserve space */
+    border-radius: 4px;
+    box-shadow: none;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
 a:hover .thumb {
-    border: 1px solid #4195fc; /* some kind of blue border */
+    border: 2px solid #FFFFFF; /* some kind of blue border */
 
     /* other CSS styles */
 
@@ -231,9 +238,9 @@ a:hover .thumb {
 
 
     /* make it glow! */
-    -webkit-box-shadow: 0px 0px 4px #4195fc;
-       -moz-box-shadow: 0px 0px 4px #4195fc;
-            box-shadow: 0px 0px 4px #4195fc;
+    -webkit-box-shadow: 0px 0px 4px #FFFFFF;
+       -moz-box-shadow: 0px 0px 4px #FFFFFF;
+            box-shadow: 0px 0px 4px #FFFFFF;
 }
 
 a:active {
