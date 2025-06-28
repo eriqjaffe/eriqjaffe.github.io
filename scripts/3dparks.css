@@ -16,7 +16,10 @@ body {
 }
 
 .header {
-	text-align:center;
+	display: flex;
+  	justify-content: center; /* horizontal */
+  	align-items: center;
+	margin-bottom: 10px;
 	width:100%;
 	font-size:3em;
     font-weight: 700;
@@ -29,6 +32,19 @@ body {
     1px -1px 0 #000,
    -1px  1px 0 #000,
     1px  1px 0 #000;
+}
+
+.header img {
+  height: 50px;
+  width: auto;  /* maintain aspect ratio */
+}
+
+.leftimg {
+	margin-right: 25px;
+}
+
+.rightimg {
+	margin-left: 25px;
 }
 
 .footer {
