@@ -246,12 +246,25 @@ a:hover {
 }
 
 .thumb {
+	width: 200px;           
+  	height: 120px;        
+  	object-fit: cover;
+	image-rendering: -webkit-optimize-contrast;
     border: 1px solid transparent;
     border-radius: 4px;
     transition: filter 0.2s ease, border-color 0.2s ease;
 }
 
-a:hover .thumb {
+.thumb2 {
+	width: 150px;
+	image-rendering: auto;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    transition: filter 0.2s ease, border-color 0.2s ease;
+}
+
+a:hover .thumb,
+a:hover .thumb2 {
     -webkit-filter: drop-shadow(1px 1px 4px #ffffff);
     filter: drop-shadow(0px 0px 4px #ffffff);
 }
@@ -259,3 +272,9 @@ a:hover .thumb {
 a:active {
   text-decoration: underline;
 }
+
+table {
+	border-spacing: 0 15px; /* 0 for columns, 10px for rows */
+	border-collapse: separate; /* must be separate for border-spacing to work */
+  }
+  
