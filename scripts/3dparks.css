@@ -11,6 +11,42 @@ body {
 	text-shadow: 1px 1px 2px black
 }
 
+.coffee-button {
+  position: fixed;    /* stays in place on scroll */
+  top: 20px;          /* distance from the top */
+  right: 20px;        /* distance from the right */
+  z-index: 9999;      /* on top of other elements */
+}
+
+.select2-option-wrapper {
+  display: flex;
+  align-items: center;
+}
+
+.select2-option-img {
+  display: inline-block;
+  width: 40px;       
+  padding-right: 8px; 
+}
+
+.select2-option-img img {
+  max-height: 22px;
+  width: auto;
+  display: block;
+  margin: 0 auto;
+}
+
+.select2-container .select2-results__option {
+  color: #000 !important;
+  text-shadow: none !important;
+}
+
+/* The selected item text shown in the box */
+.select2-container .select2-selection__rendered {
+  color: #000 !important;
+  text-shadow: none !important;
+}
+
 .subtitle {
     font-size: .8em;
 }

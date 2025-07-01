@@ -10,14 +10,37 @@
 <link href='../scripts/animate.min.css' rel='stylesheet' type='text/css'>
 <link href='../scripts/3dparks.css' rel='stylesheet' type='text/css'>
 <link href='../scripts/lightbox.css' rel="stylesheet" type="text/css">
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <meta http-equiv='cache-control' content='no-cache'> 
 <meta http-equiv='expires' content='0'> 
 <meta http-equiv='pragma' content='no-cache'>
 </head>
 <body>
 <div class="header"><img class="leftimg" src="../images/texasleague.png">Texas League<img class="rightimg" src="../images/texasleague.png"></div>
+<div class="coffee-button">
+  <a href="https://www.buymeacoffee.com/eriqjaffe" target="_blank">
+    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" 
+         alt="Buy Me A Coffee" 
+         style="height: 30px !important; width: 108.5px !important;">
+  </a>
+</div>
 <div class="footer">
-    <a href="https://www.buymeacoffee.com/eriqjaffe" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 30px !important;width: 108.5px !important;" ></a>&nbsp;&nbsp;&nbsp;&nbsp;<a href="./index.html">Return Home</a>
+    <select id="jumplist">
+        <option value="mlb" data-image="../images/Major_League_Baseball_logo.svg">Major League Baseball</option>
+        <option value="il" data-image="../images/internationalleague.png">International League</option>
+        <option value="pcl" data-image="../images/Pacific_coast_league.png">Pacific Coast League</option>
+        <option value="el" data-image="../images/eastern_league.svg">Eastern League</option>
+        <option value="sl" data-image="../images/southern_league.svg">Southern League</option>
+        <option value="tl" data-image="../images/texasleague.png">Texas League</option>
+        <option value="sal" data-image="../images/south_atlantic_league.svg">South Atlantic League</option>
+        <option value="cal" data-image="../images/californialeague.png">California League</option>
+        <option value="fsl" data-image="../images/floridastateleague.png">Florida State League</option>
+        <option value="mlbd" data-image="../images/mlbdraftleague.svg">MLB Draft League</option>
+        <option value="hist" data-image="../images/history.svg">Historical Parks</option>
+        <option value="usbl" data-image="../images/usbl.png">Daniel Saline's USBL</option>
+        <option value="fic" data-image="../images/ballpark.png">Fictional Parks</option>
+    </select>
 </div>
 <table style="width:80%; margin-left: auto; margin-right: auto;">
     <tr>
@@ -97,3 +120,57 @@
         </td>
     </tr>
 </table>
+</body>
+<script>
+  $(document).ready(function() {
+  // Set value and trigger update first
+  var path = window.location.pathname;
+  var page = path.split("/").pop();
+  var base = page.split(".")[0];
+  
+  $('#jumplist').val(base).trigger('change');
+
+  // Then attach change handler
+  $('#jumplist').on('change', function() {
+    var value = $(this).val();
+    if (value) {
+      window.location.href = value + '.html';
+    }
+  });
+});
+
+$('#jumplist').select2({
+    width: 300,
+    minimumResultsForSearch: -1,
+    templateResult: formatOption,
+    templateSelection: formatOption
+  });
+
+  $("#jumplist").on("change", function() {
+    const selectedValue = $(this).val();
+    if (selectedValue) {
+        //window.location.href = selectedValue + ".html";
+    }
+    });
+
+  function formatOption(state) {
+  if (!state.id) return state.text;
+
+  var img = $(state.element).data('image');
+  if (img) {
+    return $(`
+      <span class="select2-option-wrapper">
+        <span class="select2-option-img">
+          <img src="${img}" alt="" />
+        </span>
+        ${state.text}
+      </span>
+    `);
+  } else {
+    return state.text;
+  }
+}
+
+
+</script>
+</html>
