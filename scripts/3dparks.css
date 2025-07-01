@@ -53,7 +53,9 @@ body {
 	left:0; 
 	width:100%; 
 	height:40px; 
-	text-align:center;
+	display: flex;
+  	justify-content: center; /* horizontal */
+  	align-items: center;
 }
 
 .header2 {
