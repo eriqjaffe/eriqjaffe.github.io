@@ -39,6 +39,13 @@ body {
     1px  1px 0 #000;
 }
 
+.coffee-button {
+  position: fixed;    /* stays in place on scroll */
+  top: 20px;          /* distance from the top */
+  right: 20px;        /* distance from the right */
+  z-index: 9999;      /* on top of other elements */
+}
+
 .fitTextRight {
 	-webkit-text-stroke: 1px black;
 	text-shadow:
