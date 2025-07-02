@@ -11,6 +11,23 @@ body {
 	text-shadow: 1px 1px 2px black
 }
 
+td {
+	text-align:center;
+	vertical-align: top;
+}
+
+.five {
+	width: 20%;
+}
+
+.six {
+	width: 16.667%;
+}
+
+.seven {
+	width: 14.285%;
+}
+
 .coffee-button {
   position: fixed;    /* stays in place on scroll */
   top: 20px;          /* distance from the top */

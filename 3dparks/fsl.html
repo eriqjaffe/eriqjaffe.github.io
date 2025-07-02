@@ -26,25 +26,25 @@
   </a>
 </div>
 <div class="footer">
-    <select id="jumplist">
-        <option value="mlb" data-image="../images/Major_League_Baseball_logo.svg">Major League Baseball</option>
-        <option value="il" data-image="../images/internationalleague.png">International League</option>
-        <option value="pcl" data-image="../images/Pacific_coast_league.png">Pacific Coast League</option>
+   <select id="jumplist">
+        <option value="cal" data-image="../images/californialeague.png">California League</option>
+        <option value="usbl" data-image="../images/usbl.png">Daniel Saline's USBL</option>
         <option value="el" data-image="../images/eastern_league.svg">Eastern League</option>
+        <option value="fic" data-image="../images/ballpark.png">Fictional Parks</option>
+        <option value="fsl" data-image="../images/floridastateleague.png">Florida State League</option>
+        <option value="hist" data-image="../images/history.svg">Historical Parks</option>
+        <option value="il" data-image="../images/internationalleague.png">International League</option>
+        <option value="mlb" data-image="../images/Major_League_Baseball_logo.svg">Major League Baseball</option>
+        <option value="mlbd" data-image="../images/mlbdraftleague.svg">MLB Draft League</option>
+        <option value="pcl" data-image="../images/Pacific_coast_league.png">Pacific Coast League</option>
+        <option value="sal" data-image="../images/south_atlantic_league.svg">South Atlantic League</option>
         <option value="sl" data-image="../images/southern_league.svg">Southern League</option>
         <option value="tl" data-image="../images/texasleague.png">Texas League</option>
-        <option value="sal" data-image="../images/south_atlantic_league.svg">South Atlantic League</option>
-        <option value="cal" data-image="../images/californialeague.png">California League</option>
-        <option value="fsl" data-image="../images/floridastateleague.png">Florida State League</option>
-        <option value="mlbd" data-image="../images/mlbdraftleague.svg">MLB Draft League</option>
-        <option value="hist" data-image="../images/history.svg">Historical Parks</option>
-        <option value="usbl" data-image="../images/usbl.png">Daniel Saline's USBL</option>
-        <option value="fic" data-image="../images/ballpark.png">Fictional Parks</option>
     </select>
 </div>
 <table style="width:80%; margin-left: auto; margin-right: auto;">
     <tr>
-        <td style="text-align: center;">
+        <td>
             <a href="../images/mlb/gms/preview.jpg" data-lightbox="gms" data-title="George M. Steinbrenner Field - <a href='https://www.mediafire.com/file/ske5ymiyeggq3pc/George_M._Steinbrenner_Field_%2528Rays_Version%2529.zip/file' target='_blank'>Download Here</a>.">
             <img class="thumb" src="../images/mlb/gms/preview.jpg"><br>George M. Steinbrenner Field<br><span class="subtitle">Tampa, Florida</span></a>
             <a style="display:none;" href="../images/mlb/gms/preview2.jpg" data-lightbox="gms" data-title="George M. Steinbrenner Field - <a href='https://www.mediafire.com/file/ske5ymiyeggq3pc/George_M._Steinbrenner_Field_%2528Rays_Version%2529.zip/file' target='_blank'>Download Here."></a>
@@ -52,7 +52,7 @@
             <a style="display:none;" href="../images/mlb/gms/preview4.jpg" data-lightbox="gms" data-title="George M. Steinbrenner Field - <a href='https://www.mediafire.com/file/ske5ymiyeggq3pc/George_M._Steinbrenner_Field_%2528Rays_Version%2529.zip/file' target='_blank'>Download Here."></a>
             <a style="display:none;" href="../images/mlb/gms/preview5.jpg" data-lightbox="gms" data-title="George M. Steinbrenner Field - <a href='https://www.mediafire.com/file/ske5ymiyeggq3pc/George_M._Steinbrenner_Field_%2528Rays_Version%2529.zip/file' target='_blank'>Download Here."></a>
         </td>
-        <td style="text-align: center;">
+        <td>
             <a href="../images/mlb/td/preview.jpg" data-lightbox="td" data-title="TD Ballpark - <a href='https://www.mediafire.com/file/i2z03do5n0xb941/TD_Ballpark.zip/file' target='_blank'>Download Here</a>.">
             <img class="thumb" src="../images/mlb/td/preview.jpg"><br>TD Ballpark<br><span class="subtitle">Dunedin, Florida</span></a>
             <a style="display:none;" href="../images/mlb/td/preview2.jpg" data-lightbox="td" data-title="TD Ballpark - <a href='https://www.mediafire.com/file/i2z03do5n0xb941/TD_Ballpark.zip/file' target='_blank'>Download Here."></a>
@@ -88,12 +88,7 @@ $('#jumplist').select2({
     templateSelection: formatOption
   });
 
-  $("#jumplist").on("change", function() {
-    const selectedValue = $(this).val();
-    if (selectedValue) {
-        //window.location.href = selectedValue + ".html";
-    }
-    });
+  
 
   function formatOption(state) {
   if (!state.id) return state.text;
