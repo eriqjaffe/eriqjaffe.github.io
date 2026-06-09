@@ -2,11 +2,10 @@
 <html>
 <head>
 <title>OOTP Blender Baking Tutorial</title>
-<link rel="icon" type="image/png" href="../images/ballpark.jpg">	
+<link rel="icon" type="image/png" href="../images/blender.png">	
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/drawer/3.2.2/css/drawer.min.css">
 <script type="text/javascript" src="../../scripts/jquery-1.11.3.min.js"></script>
 <script type="text/javascript" src="../../scripts/jquery.browser.min.js"></script>
-<script type="text/javascript" src="../../scripts/jquery.glow.js"></script>
 <script type="text/javascript" src="../../scripts/modernizr.custom.68502.js"></script>
 <link href='../../scripts/animate.min.css' rel='stylesheet' type='text/css'>
 <link href='../../scripts/blender.css' rel='stylesheet' type='text/css'>
@@ -17,7 +16,7 @@
 <body>
 <div class="coffee-button">
   <a href="https://www.buymeacoffee.com/eriqjaffe" target="_blank">
-    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.jpg" 
+    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" 
          alt="Buy Me A Coffee" 
          style="height: 30px !important; width: 108.5px !important;">
   </a>
@@ -100,8 +99,8 @@
     <p>At this point, it's probably a good idea to Save the model
     as a Blender file, which you can do from the File menu.  <b>I recommend saving
     often so you can always revert back to a previous state in case you do
-    something you don't want to do or get lost.</b><br>
-    <br>
+    something you don't want to do or get lost.</b></p>
+
     <h1 id="section4">Adding Sunlight</h1>
 
     For a daytime bake, the first thing we want to do is add a sun to the model.  <br>
@@ -382,7 +381,8 @@
     <img border=0 width=624 height=375
     src=".\images\image074.jpg"><br>
     <br>Repeat this process for every component you wish to bake.<br>
-    <br>There will probably be elements you don't want to bake shadows into, such as backlight signs, LED ribbons, and the crowd (since we'll be replacing that texture with the 3D crowd anyways).  There is a section below detailing what to do for those.
+    <br>There will probably be elements you don't want to bake shadows into, such as backlight signs, LED ribbons, and the crowd (since we'll be replacing that texture with the 3D crowd anyways).  There is a section below detailing what to do for those.<br>
+    <br>I would suggest you save your work after each successful bake to make it easier to revert back.
 
     <h1 id="section10">Save a Copy for Night Baking</h1>
     <p>Up until this point, everything we've done has been with a "daytime" bake of the model in mind.  But it's entirely likely that your ballpark will also need a nighttime bake.  Since the steps in the next section will replace the model's textures with the baked textures, we'll need to have a separate "clone" of the model for the nighttime bake, and <i>this is the best time to do that</i>.  That way, you'll have a copy of the model with all of the UV unwrapping done, but nothing permanently baked into the model.</b></i></p>
