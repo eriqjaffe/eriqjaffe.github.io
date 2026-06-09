@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>OOTP Blender Baking Tutorial</title>
+<link rel="icon" type="image/png" href="../images/ballpark.jpg">	
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/drawer/3.2.2/css/drawer.min.css">
+<script type="text/javascript" src="../../scripts/jquery-1.11.3.min.js"></script>
+<script type="text/javascript" src="../../scripts/jquery.browser.min.js"></script>
+<script type="text/javascript" src="../../scripts/jquery.glow.js"></script>
+<script type="text/javascript" src="../../scripts/modernizr.custom.68502.js"></script>
+<link href='../../scripts/animate.min.css' rel='stylesheet' type='text/css'>
+<link href='../../scripts/blender.css' rel='stylesheet' type='text/css'>
+<meta http-equiv='cache-control' content='no-cache'> 
+<meta http-equiv='expires' content='0'> 
+<meta http-equiv='pragma' content='no-cache'>
+</head>
+<body>
+<div class="coffee-button">
+  <a href="https://www.buymeacoffee.com/eriqjaffe" target="_blank">
+    <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.jpg" 
+         alt="Buy Me A Coffee" 
+         style="height: 30px !important; width: 108.5px !important;">
+  </a>
+</div>
+
+<div class="sidenav">
+  <a href="#section1">Setting Up Your SketchUp Model</a>
+  <a href="#section2">Blender Pre-Requisites</a>
+  <a href="#section3">Setting Up Your Blender Workspace</a>
+  <a href="#section4">Adding Sunlight</a>
+  <a href="#section5">UV Unwrapping</a>
+  <a href="#section5a">Day Texture Baking</a>
+  <a href="#section10">Save a Copy for Night Baking</a>
+  <a href="#section6">Using The Baked Image</a>
+  <a href="#section13">Exporting the OBJ file</a>
+  <a href="#section11">Setting Up Night Lighting</a>
+  <a href="#section12">Night Texture Baking</a>
+  <a href="#section7">Excluding Textures From Baking</a>
+  <a href="#section8">Troubleshooting / FAQ</a>
+  <a href="#section9">Resources & Files</a>
+</div>
+
+<div class="main">
+    <div class="header">How To Use Blender To Bake Textures</div>
+    <h1 id="section1">Setting Up Your SketchUp Model</h1>
+    <p>If you've done any 3D Modeling for OOTP before, you're probably familiar that faces in SketchUp have two sides - front and back, which are shown as white and gray, respectively.  In order to properly bake textures with Blender, make sure that <i>every</i> face is showing the front.  So when in Monochrome view mode, every face should appear white:</p>
+    <img src=".\images\sketchup_white.jpg" class="blender-image">
+    <p>Additionally, you'll want to compartmentalize the model as much as possible by enclosing things inside named components.  Each component will be baked separately, so the more components you have, the more detail you'll be able to get.  <i>Do not nest components.</i>  You can have multiple instances of the same component, but I find that adds unnecessary complexity to the baking process for minimal gain.  <i><b>The exception to this is stadium lighting.</b></i>  While it's irrelevant for the "daytime" bake, it works better for the way Blender handles light emission for each light source to be its own component.  It will add steps to the baking process, but it's not terrible.</p>
+    <img src=".\images\sketchup_components.jpg" class="blender-image">
+    <p>There are likely going to be a few faces that you will want to exclude from the baking process - things like LED Ribbons, crowds, live scoreboards, backlight signs, etc.  I recommend just putting all of those faces into a "no_bake" component to keep things organized.</p>
+
+    <h1 id="section2">Blender Pre-Requisites</h1>
+
+    <p>By default, Blender can't read SketchUp files, but there is an add-on available to enable it.  Download the latest release from the project's GitHub page:  <a href="https://github.com/RedHaloStudio/Sketchup_Importer/releases" target="_blank">https://github.com/RedHaloStudio/Sketchup_Importer/releases</a>.  You will want to download the .zip file.</p>
+
+    <p>In Blender, go to Edit &rarr; Preferences &rarr; Add-ons, click the little down arrow at the top right of the window, and choose “Install from Disk.”  Navigate to the folder you downloaded the importer to and double-click the .zip file to install it.  Once it is installed you will see it in the list of add-ons.  Make sure the little checkbox is checked to enable it.</p>
+
+    <img src=".\images\blender_ext_1.jpg" class="blender-image">
+    <img src=".\images\blender_ext_2.jpg" class="blender-image">
+
+    <p>Note that I've only used this to import models created with SketchUp 2017 Make, though it should work with newer versions of SketchUp as well.</p>
+
+    <p>A quick side note for working in Blender - <b>SAVE OFTEN</b>.</p>  
+
+    <p>I'll remind you about that later, but it's a good idea to save your work in Blender frequently so you can go revert back to the saved model if you mess up a step.  If you want to be really careful, save incremented files (model_1.blend, model_2.blend, etc.) so you can go back to a specific point in time if you wish.  CTRL-Z to undo is fine, but sometimes you don't realize you've made a mistake until a bit down the line so reverting to an earlier save is a safe thing to do.</p>
+
+    <h1 id="section3">Setting Up Your Blender Workspace</h1>
+
+    <p>We want to have three separate “panes” to work in – one for the 3D Viewport, one for the UV Editor, and one for the Shader Editor.  Mouse over the very bottom left corner of the 3D “graph” window until the icon turns into a small plus sign – then you can click and drag open another “pane.”  Panes will, by default, duplicate the pane you dragged from, so the first time you'll wind up with two 3D Viewport panes.  You can assign each pane to a different view by mousing over the pane and then clicking Shift-F10 for the UV Editor, Shift-F3 for the Shader Editor, and Shift-F5 for the 3d Viewport.  There is also a small menu at the top left corner of each pane you can select from.  The layout you choose is entirely up to you.  This video provides a quick tutorial on how to split and combine the panes:</p>
+
+    <iframe width="560" height="315" src="https://www.youtube.com/embed/qp9E_S4iIkE?si=NwjatniUaYj13RpJ" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+
+    <p>First, you'll want to delete the little gray box that Blender creates by default – just click on it in the 3D Viewport - it will be highlighted with an orange border when it is selected - and click the Delete button and it will go away.</p>
+
+    <p>You can now import the SketchUp model by going to File &rarr; Import &rarr; SketchUp and navigating to the model's folder.  You may want to add a bookmark to the model's folder to make getting there quicker.  When you're done you'll have a window that should look something like this:</p>
+
+    <br>
+    <img border=0 width=624 height=335
+    src=".\images\image061.jpg"></p>
+
+    <p>The UV Editor is to the left, the 3D Viewport is to the
+    right of that, and the Shader Editor is below the 3D Viewport.  You will also
+    see a couple of panels to the right side of the screen.  Blender classes both
+    of these as “Data” views.  The top one is set to the “Outliner” panel, which
+    shows a hierarchical view of the components, materials, and other assets in
+    your model.  The bottom one is the “Properties” panel, which we'll be using a
+    lot.  You can theoretically switch these views, but you really don't need to
+    for what we're doing.<br>
+    <br>
+    Once the SketchUp model is imported, the first thing we want to do get rid of
+    the Camera and Light that get imported.  You'll see them at the top of the
+    Outliner panel under “Scene Collection &rarr; Collection”:<br>
+    <br>
+    <img border=0 width=367 height=642
+    src=".\images\image062.jpg"><br>
+    <br>
+    Just click on each of those in the panel and Delete them.  They are not
+    necessary.</p>
+
+    <p>At this point, it's probably a good idea to Save the model
+    as a Blender file, which you can do from the File menu.  <b>I recommend saving
+    often so you can always revert back to a previous state in case you do
+    something you don't want to do or get lost.</b><br>
+    <br>
+    <h1 id="section4">Adding Sunlight</h1>
+
+    For a daytime bake, the first thing we want to do is add a sun to the model.  <br>
+    <br>
+    In the 3D Viewport, make sure you are in “Object” mode from the menu at the top
+    left of the pane and press the Z key and choose “Rendered” from the popup. 
+    That will give you a quick real-time view of what the lit model looks like.  <br>
+    <br>
+    <img border=0 width=624 height=348
+    src=".\images\image005.jpg"><br>
+    <br>
+    Without a sun (or any light source) it's awfully dark, so let's shine some
+    light on it.<br>
+    <br>
+    <img border=0 width=624 height=362
+    src=".\images\image063.jpg"><br>
+    <br>
+    In the Properties panel, click the “World” tab – it's the small red globe
+    icon.  Click the yellow dot next to “Color” and choose “Sky Texture” from the
+    menu.<br>
+    <br>
+    <img border=0 width=624 height=287
+    src=".\images\image064.jpg"><br>
+    <br>
+    The World tab will now show some settings you can choose.  I find the “Multiple
+    Scattering” setting works best (older versions of Blender may call it
+    “Nishita”).  As you can see, the default settings are pretty severe:<br>
+    <br>
+    <img border=0 width=624 height=352
+    src=".\images\image065.jpg">
+</p>
+
+    <p>I would dial the Sun Intensity down to about 0.300 and
+    Strength down to 0.500.  Play around with the various strength and positioning settings until you like
+    what you see:<br>
+    <br>
+    <img border=0 width=624 height=348
+    src=".\images\image066.jpg"></p>
+
+    <p>To make things easier on your computer once you're happy
+    with the lighting, you can go back to “Material Preview” from that “Z” menu in
+    the 3D Viewport.  That will show you the textures without any lighting effects
+    so it's easier on the system since it's not doing any real-time rendering.<br>
+    
+    <h1 id="section5">UV Unwrapping</h1>
+    In order to properly bake textures, the first thing we need to do is what's known as UV Unwrapping.  Basically, what that does is take all of the selected faces and map them onto a flat image.  When that UV Map is applied to the same faces, the image is "wrapped" around the faces.  This is utlimately how OOTP's included 3D Models work, but the SketchUp model's UVs will be an overlaping mess (we'll see that below) so we need to properly properly unwrap the mesh in order to bake.<br>
+    <br>
+    From the list of “SKP Mesh Objects” in the Outliner, choose the component you
+    want to bake.  For this demonstration I will start with the “C-field”
+    component.  Click that in the Outliner and you'll see the field component
+    highlighted in orange in the 3D Viewport:<br>
+    <br>
+    <img border=0 width=624 height=248
+    src=".\images\image067.jpg"><br>
+    <br>
+    You'll also see that the UV Editor has changed and it's a mess with textures overlapping each other, so we have to
+    properly unwrap the component.<br>
+    <br>
+    <img border=0 width=497 height=558
+    src=".\images\image016.jpg"></p>
+
+    <p>In the Properties panel, click the “Data” tab (the inverted
+    green triangle icon) and expand the “UV Maps” section.  You'll see a UVMap
+    there, which is the one you are looking at.  You can rename it if you wish, but
+    it's not necessary.  What you want to do here is click the little Plus sign,
+    which adds a new UV Map.  Again, you can rename it if you wish, but it's not
+    strictly necessary.  Renaming the maps can help you keep track what you're
+    looking at.  To rename the map, just double-click on the name in the list and
+    start typing.  For this, I'm going to rename the field maps “field_original” and
+    “field_new.”  The big thing is that you want to leave the “camera” icon active on
+    the original map and highlight the new map like so:<br>
+    <br>
+    <img border=0 width=369 height=233
+    src=".\images\image017.jpg"></p>
+
+    <p>This will prevent Blender from messing around with any
+    texture scaling or orientation you have done in SketchUp. <b>This is important!</b><br>
+    <br>
+    Now back in the 3D Viewport, press Tab to go into Edit mode, or just choose it
+    from the menu at the top of the panel.  Press “A” to select all of the faces in
+    the selected component.  The selected faces will turn orange in both the 3D
+    Viewport and UV Editor. </p>
+
+    <p><img border=0 width=624 height=279
+    src=".\images\image068.jpg"></p>
+
+    <p>From the Face menu in the 3D Viewport, choose “Triangles to
+    Quads”, which will help limit the number of faces we're dealing with.<br>
+    
+</p>
+
+    <p>Over in the UV Editor, click the Image menu and choose
+    “New.”  Give the new image a name.  Because this is the daytime render of the
+    field, I'm calling it “field_day” since OOTP will use that to determine whether
+    to show the day or night texture down the line.  The default image size is
+    1024x1024, but you can set it to whatever you want.  The bigger the image, the
+    better detail you'll get at the cost of being more for OOTP to handle
+    rendering.  Since the field is a fairly key element, I'm going to make it 2048x2048.
+    After naming and setting the size, click “New Image”.  The UV editor
+    will show that new image – which is currently an empty square, behind the
+    various orange UVs.<br>
+    <br>
+    Back in the 3D Viewport, press the U key (or click the UV menu) and choose
+    “Smart UV Project” from the menu:<br>
+    <br>
+    <img border=0 width=367 height=459
+    src=".\images\image069.jpg"><br>
+    <br>
+    Set the Island Margin to <i>at least </i>0.010 and click Unwrap.  <br>
+    <br>
+    <img border=0 width=345 height=290
+    src=".\images\image022.jpg"></p>
+
+    <p>Hey, presto, the UV Map has changed!<br>
+    <br>
+    <img border=0 width=624 height=644
+    src=".\images\image070.jpg"></p>
+
+    <p>Now we're getting someplace!  The next step is telling
+    Blender what to bake where.<br>
+
+    <h1 id="section5a">Day Texture Baking</h1>
+
+    In the 3D Viewport, press Tab go back to Object mode.<br>
+    <br>
+    In the Properties panel, choose the “Material” tab – it's the small circle with
+    a red checkerboard in it.  Scroll back up to the top to see all the materials
+    in the component.  If you see “DefaultMaterial” in there, it means you have
+    some untextured surfaces somewhere.  They are probably surfaces that aren't
+    visible anyways otherwise you'd probably have noticed in SketchUp.  Generally
+    speaking, you can just delete that material without any noticeable change. 
+    Just highlight the material in the list and click the little “minus” sign to
+    remove it.  I'm going to leave it in for the time being to show how to work
+    around it being there if you're not comfortable deleting it.<br>
+    <br>
+    <img border=0 width=359 height=519
+    src=".\images\image025.jpg"><br>
+    <br>
+    Now we're going to get into the Shader Editor.  A quick note about the Shader
+    Editor – navigating it is weird.  There are things that it makes kind of hard
+    to see because it's zoomed out so much.  You can zoom in and out using the
+    scroll wheel on your mouse and “move” the viewport around by clicking the
+    scroll wheel and moving the mouse around.  Making the pane bigger doesn't seem
+    to scale it up, either.  Anyhow…<br>
+    <br>
+    Click the first material in the list of materials over in the Properties pane:<br>
+    <br>
+    <img border=0 width=369 height=287
+    src=".\images\image026.jpg"></p>
+
+    <p>You'll notice that the Shader Editor is now looking
+    specifically at that material:<br>
+    <br>
+    <img border=0 width=624 height=309
+    src=".\images\image071.jpg"></p>
+
+    <p>First we have to give it a “Source” UV map.  Press Shift-A
+    and go to Input &rarr; UV Map<br>
+    <br>
+    <img border=0 width=384 height=484
+    src=".\images\image029.jpg"><br>
+    <br>
+    Click the little icon in the left and choose the “original” UV Map.  This is <i>not
+    </i>the one you added, but the one we left the camera icon active on before. 
+    Click the little purple dot next to “UV” in there and link it to the purple
+    “Vector” dot in the materials image box:<br>
+    <br>
+    <img border=0 width=390 height=301
+    src=".\images\image030.jpg"><br>
+    <br>
+    Now we're going to add a second UV Map.  Same process to add it as before, but
+    we're going to assign the <i>new </i>UV Map we created earlier.  Don't link it
+    to anything yet.<br>
+    <br>
+    Then, again, Shift-A &rarr; Texture &rarr; Image Texture.  This will be the
+    bake's target image.<br>
+    <br>
+    <img border=0 width=423 height=436
+    src=".\images\image031.jpg"><br>
+    <br>
+    From the little menu icon thing, click it and it will bring up a list of every
+    image the model knows about.  You can scroll until you find the target you
+    want, or just start typing “field_day” to find it.<br>
+    <br>
+    <img border=0 width=309 height=309
+    src=".\images\image032.jpg"></p>
+
+    <p>Then link the UV from the <i>second</i> UV Map we added to
+    the Vector of the bake target.<br>
+    <br>
+    <img border=0 width=410 height=283
+    src=".\images\image033.jpg"></p>
+
+    <p>The next thing to do is simply click the bake target so that
+    it has a white border.  <b>This is critical</b> since if you don't highlight
+    it, Blender won't know where you want to bake things to.  When it's done, the
+    Shader Editor will look like this:<br>
+    <br>
+    <img border=0 width=624 height=231
+    src=".\images\image072.jpg"><br>
+    <br>
+    Now you repeat the process for every other material in the component.  On the
+    bright side, you can speed this up by shift-clicking each of the 3 things we
+    added (they'll be highlighted in orange or white, with white being the last one
+    you clicked on) and copy them by pressing CTRL-C.  You'll get a little
+    notification that you've copied 3 nodes down at the bottom of the window:<br>
+    <br>
+    <img border=0 width=317 height=113
+    src=".\images\image036.jpg"><br>
+    <br>
+    Back over in the Materials list, click the next material.  Notice that the
+    Shader Editor looks like it did when we originally clicked the first material,
+    except the image box references the new material and its' source image.<br>
+    <br>
+    Mouse somewhere into the Shader Editor and paste the nodes by pressing CTRL-V. 
+    Where they get placed seems to be somewhat based on where the mouse is but it
+    also seems kind of random.  While they're still selected you can click and drag
+    them around so they're not in the way.  You wlll have to re-link the UV of the
+    original UV Map to the Vector node of the image, but everything else can stay
+    as is.  Just make sure the bake target is still highlighted in white.<br>
+    <br>
+    If you left the DefaultMaterial around, you'll notice there's no image.  That's
+    because there isn't any!  Blender will complain about that.  To keep Blender
+    quiet, link the original UV Maps UV node to the “Normal” node in the
+    “Principled BSDF” box.<br>
+    <br>
+    <img border=0 width=624 height=340
+    src=".\images\image037.jpg"><br>
+    <br>
+    We are now almost ready to bake!<br>
+    <br>
+    Back in the properties panel, click on the “Render” tab (the icon looks like a
+    digital camera).  Make sure the Render Engine is set to Cycles.  If you have a
+    decent graphics card, set the Device to GPU Compute to help speed things
+    along.  Under the “Render” section, lower the Max Samples.  The higher that is,
+    the higher quality the render will be, but the longer it will take.  Since at
+    this point we just want to make sure the bake is working at all, set it to
+    something low.  Something like 1 or 4.<br>
+    <br>
+    <img border=0 width=343 height=423
+    src=".\images\image038.jpg"><br>
+    <br>
+    Scroll down and you'll see a Bake section.  Expand that and set the Bake Type
+    to Diffuse and leave all three of the Contributions under “Influence” checked.<br>
+    <br>
+    <img border=0 width=309 height=303
+    src=".\images\image039.jpg"><br>
+    <br>
+    Then…click “Bake”!<br>
+    <br>
+    Down at the bottom of the screen you'll get a small progress bar, followed by a
+    confirmation that the Baking map has been saved to an internal image.<br>
+    <br>
+    <img border=0 width=360 height=87 id="Picture 2"
+    src=".\images\image040.jpg"></p>
+
+    <p><br>
+    <img border=0 width=468 height=117
+    src=".\images\image041.jpg"><br>
+    <br>
+    And now over in the UV Editor, you will see the baked texture behind the UV
+    grid!<br>
+    <br>
+    <img border=0 width=624 height=628
+    src=".\images\image073.jpg"><br>
+    <br>
+    Once you're happy with the rough bake, go back and increase the Max Samples to
+    something lie 128 or 256.  The higher the number, the higher quality the bake, 
+    but the bake will also take longer.<br>
+    <br>
+    Once you've finished baking and if you like what you see, <b>save the image</b>. 
+    Blender won't save it automatically for you!  In the UV Editor, just choose "Image &rarr; Save."<br>
+    <br>
+    By default, it will save the
+    image as a PNG file with the name you gave it in the same folder your model is
+    saved in:<br>
+    <br>
+    <img border=0 width=624 height=375
+    src=".\images\image074.jpg"><br>
+    <br>Repeat this process for every component you wish to bake.<br>
+    <br>There will probably be elements you don't want to bake shadows into, such as backlight signs, LED ribbons, and the crowd (since we'll be replacing that texture with the 3D crowd anyways).  There is a section below detailing what to do for those.
+
+    <h1 id="section10">Save a Copy for Night Baking</h1>
+    <p>Up until this point, everything we've done has been with a "daytime" bake of the model in mind.  But it's entirely likely that your ballpark will also need a nighttime bake.  Since the steps in the next section will replace the model's textures with the baked textures, we'll need to have a separate "clone" of the model for the nighttime bake, and <i>this is the best time to do that</i>.  That way, you'll have a copy of the model with all of the UV unwrapping done, but nothing permanently baked into the model.</b></i></p>
+    <p>From the File menu, choose "Save Copy" and call it something like "ballpark_night.blend" or whatever helps you keep it straight.</p>
+    <h1 id="section6">Using The Baked Image</h1>
+    In the 3D Viewport, make sure you're in Object mode and press “Z” and set the
+    view to Material Preview.  You'll notice that the field looks…just like it did
+    before you baked.  Nothing has changed.  So ow do we <i>use</i> this image that
+    we've saved?<br>
+    <br>
+    Back in the Materials tab over on the Properties panel, highlight each materials
+    in the component and click the minus button to delete it.  This is a one-by-one
+    process.  When you're done, there will be no materials  in the list and the
+    component will just be…gray.<br>
+    <br>
+    <img border=0 width=624 height=306
+    src=".\images\image075.jpg"><br>
+    <br>
+    This is actually what we want to see.  Click on the plus button next to the Materials
+    list to add a new material slot, and then click the “New” button below the
+    list.<br>
+    <br>
+    <img border=0 width=459 height=550
+    src=".\images\image076.jpg">
+</p>
+
+    <p>Give the new material a distinctive name – in this case, I'm
+    going to just call it “field.”  </p>
+
+    <p>We now have to make the “new” UV Map active – in the “UV
+    Maps” Section of the Data tab, click the camera icon next to the “new” UV Map.<br>
+    <br>
+    <img border=0 width=356 height=214
+    src=".\images\image050.jpg"><br>
+    <br>
+    You will notice that a new pair of boxes appeared inside the Shader Editor when
+    you created the new material.<br>
+    <br>
+    <img border=0 width=624 height=233
+    src=".\images\image077.jpg"></p>
+
+    <p>
+    What we're going to do here is similar to what we had to do to set up baking.  Add
+    a new UV Map (Shift-A &rarr; Input –&gt; UV Map) and a new Image texture
+    (Shift-A &rarr; Texture &rarr; Image Texture).</p>
+
+    <p>Set the new UV Map node to use the “new” UV Map (“field_new”),
+    and load the field image you saved a bit ago into the Image node by clicking
+    the “Open” button and choosing the appropriate image.<br>
+    <br>
+    Link the UV node from the UV Map to the Vector node of the Image, and link the yellow
+    “Color” node of the Image to the “Base Color” node of the Principled BSDF.  The
+    Shader Editor should look like this:<br>
+    <br>
+    <img border=0 width=624 height=254
+    src=".\images\image078.jpg"><br>
+    <br>
+    And up in the 3D Viewport, look at that!<br>
+    <br>
+    <img border=0 width=624 height=322
+    src=".\images\image079.jpg"><br>
+    <br>
+    Congratulations, you have successfully baked a component and applied the baked
+    texture to the model!  Now all you have to do is repeat that process for every component in your model.  :D
+
+    <h1 id="section13">Exporting the OBJ file</h1>
+
+    To see how it looks in OOTP, we'll need to export this to a format that OOTP can understand - 
+    the good old OBJ format, same as we've been exporting from SketchUp for years.<br>
+    <br>
+    Go to File &rarr; Export &rarr; Wavefront (.obj). 
+    It will default to the same folder the Blender file is in.  For the purposes of
+    this tutorial I am saving it in a subfolder called “baked” but it really doesn't
+    matter.  One very important thing to note is that you have to set the Path Mode
+    to “Copy” – scroll down in the right side of the save dialog and set it – <b>this
+    is important</b>.  After you've set that, click the "Export Wavefront OBJ" button.<br>
+    <br>
+    <img border=0 width=382 height=637
+    src=".\images\image057.jpg"><br>
+    <br>
+    If you look in the model's folder, you'll notice we have the .obj, .mtl and
+    baked texture file(s) all in the same folder:<br>
+    <br>
+    <img border=0 width=551 height=251
+    src=".\images\image058.jpg"><br>
+    <br>
+    And if you load that model into OOTP, you'll see your lovely shadows on the
+    field!<br>
+    <br>
+    <img border=0 width=624 height=442 id="Picture 1"
+    src=".\images\image080.jpg"><br>
+
+    <h1 id="section11">Setting Up Night Lighting</h1>
+
+    <p>Now is when we open up that _night model we saved before applying all of the daytime baked textures.  File &rarr; Open &rarr; (modelname)_night.blend</p>
+
+    <p>The first thing we have to do is get rid of the sunlight we added at the beginning, since it's no longer daytime.  In the Properties panel, click the “World” tab.  Click the "Sky Texture" and choose either "Remove" or "Disconnect."</p>
+
+    <img src=".\images\image087.jpg">
+
+    <p>If your 3D Viewport is sent to "Rendered" you'll notice that all the light has gone away.  The next step is to get the light towers to actually emit light.</p>
+
+    <p>In Object mode, select the light source you want to work with and then go into Edit mode.  Make sure you're in "Face Select" mode (press the "3" key) and select the face that have the "light" texture:</p>
+
+    <img src=".\images\image088.jpg">
+
+    <p>There are two different ways to set up lighting for our purposes - one is more generic, one is more granular.</p>
+
+    <p>For generic lighting, go back into the Materials tab and select the material that represents the acutal lights. Expand the "Surface" section and then expand the "Emission" section from there.  Make sure the Emission color is set to white (which it should be by default) and then crank up the strength until you're happy with how it looks.  You'll probably need to turn it up a lot.  You can also access those settings in the Shader editor, but it's easier to see in the Properties panel.  <i>This will apply the same lighting emission settings to every instance of that material.</i></p>
+
+    <img src=".\images\image091.jpg">
+
+    <p>If you want more granular control over the lighting, you can create a new material slot inside a component to act as the emitter.</p>
+
+    <p>In Edit mode, make sure the faces containing the light's texture are selected.  Then, in the Materials tab, add a new material slot by clicking the plus sign next to the list of materials.  Give it a distinctive name such as "floodlights_1".  Then click "Assign" to assign that material to the selected face(s).  When you do that, the face will just become a blank white space which is good enough for our purposes.</p>
+
+    <img src=".\images\image089.jpg">
+
+    <p>Just like above, set the Emission strength and color to your satisfaction.  But <i>this</i> time it will only affect that selected component.</p>
+
+    <img src=".\images\image090.jpg">
+
+    <p>When you're done, you should have a nicely lit ballpark.</p>
+
+    <img src=".\images\image092.jpg">
+
+    <p>One thing to note is that an "emitter" emits light in a 360° sphere, so it's sending light in all directions.  You can contain this light by adding a surface into your model in SketchUp to act as the "back" of the lights.  That should block the light from going in any directions you don't want it to go.  But, honestly, for our purposes that's really overthinking things.</p>
+
+    <h1 id="section12">Night Texture Baking</h1>
+
+    <p>Since you've already UV Unwrapped your components, baking the night texture follows the same procedure as the day bake.  Everything is already set up, in fact!  Internally, Blender will usethe same bake target images we created earlier.</p>
+
+    <p>The only difference - once you've finished baking and if you like what you see, <b>save the image with the _night name</b>.  As before, Blender does not automatically save the image. So in the UV Editor, just choose "Image &rarr; Save As."</p>
+
+    <img src=".\images\image093.jpg">
+
+    <p>When you save the image, <i>just be sure to change _day to _night!</i> This, of course, is consistent with what OOTP expects for determining day and night textures.</p>
+
+    <img src=".\images\image094.jpg">
+
+    <p>When you're done, you'll have day and night textures ready to go!</p>
+
+    <h1 id="section7">Excluding Textures From Baking</h1>
+    <p>There are <i>definitely</i> going to be some textures that you will not want to bake - you may remember I recommended a "no_bake" component to contain those textures.</p>
+    <p>The problem is that Blender's OBJ exporter won't actually export textures that have not been mapped using the above technique - notice that the baked model's folder only contains the field_day.jpg image, and none of the other textures that are in the model.  This has to do with the way Blender handles images, and it's kind of a pain.  Ultimately, the simplest thing to do is to use SketchUp for this - copy that "no_bake" component into a new model and just export <i>that</i> model to an OBJ file.  Then copy the files from that model's textures folder into the baked model's folder.  You may also need to edit the filenames to match what the .mtl file Blender exported says, or edit the .mtl file to match the filenames.</p>
+    
+    <h1 id="section8">Troubleshooting / FAQ</h1>
+    <p class="question">As I go through the components, sometimes the materials already seem to have UV Maps and bake images assigned to them and have some things highlighted in red, why?</p>
+    <p>Generally that's because it's a material that is used in more than one component, and which you've already come across.  Each material can only have one Shader setting, and it follows the material around every time it's encountered.  The red highlights are because those UV maps & images are not "found" within the context of the component.  All you have to do is just adjust the red highlighted items to match the other materials found in the component and you can bake normally.</p>
+    <p class="question">When I bake, some of the textures are baking as completely black, how do I fix that?</p>
+    <p>What's happening there is that the faces baking black are still somehow facing the wrong way.  Luckily, it's fixable in Blender.</p>
+    <p>In the 3D Viewport, open the "Overlays" menu - it's the one that looks like two overlapping circles - and check the "Face Orentation" checkbox.  Any faces that are backwards will become highlighted in red.  In older versions of Blender, front-facing faces will become tinted in blue, although Blender 5 changed that so that the blue tint is completely transparent.</p>
+    <img src=".\images\image081.jpg" style="height:350px;">&nbsp;<img src=".\images\image082.jpg">
+    <p>In Edit mode, press the "3" key to enter "Face Select" mode.  You can also click the small icon that looks like to overlapping rectangles.</p>
+    <img src=".\images\image084.jpg">
+    <p>Select the faces that are facing the wrong way and choose Mesh &rarr; Normals &rarr; Recalculate Outside, and the selected faces should flip the right way.  If not, there is an explicit "Flip" option in that menu if you need to do anything more detailed.</p>
+    <img src=".\images\image083.jpg">&nbsp;<img src=".\images\image086.jpg" style="height:350px;">&nbsp;<img src=".\images\image085.jpg">
+    <p>Then try baking again.</p>
+
+    <p class="question">During a bake, I got a message saying "No active and selected image texture node found in material "material name" for object "component name".  What does that mean?</p>
+    <p>Simply put, that means that the bake target image is not specified for that material.  Go back through the materials list for your component and ensure that the bake target image is selected and highlighted in white.</p>
+    <img border=0 width=624 height=231
+    src=".\images\image072.jpg"><br>
+
+    <p class="question">After baking a texture, I clearly miscalculated how large the bake target needs to be.  How can I fix that?</p>
+    <p>In the UV Editor, just click on Image &rarr; Resize and enter your new desired size.  The image will scale up or down accordingly.  Then simply re-run the bake and it will bake to the new size.
+
+    <h1 id="section9">Resources & Files</h1>
+    <p><a href="./files/tutorial.skp">SketchUp Tutorial Model</a></p>
+    <p><a href="./files/tutorial.blend">Blender Tutorial Model (Day)</a></p>
+    <p><a href="./files/tutorial_night.blend">Blender Tutorial Model (Night)</a></p>
+    <p><a href="https://archive.org/details/sketchupmake-2017-2-2555-90783-pt-br-x64">SketchUp Make 2017 installer</a></p>
+    <p><a href="./files/OBJexporter.zip">OBJ Exporter plugin for SketchUp</a></p>
+    <p><a href="https://www.blender.org/" target="_blank">Blender Website</a></p>
+    <p><a href=https://github.com/RedHaloStudio/Sketchup_Importer/releases/p" target="_blank">SketchUp Import Plugin for Blender</a>
+</div>
+</body>
+</html>

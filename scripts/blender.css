@@ -1,0 +1,91 @@
+@import url('https://fonts.googleapis.com/css2?family=Cabin:ital,wght@0,400..700;1,400..700&display=swap');
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+	font-family: 'Cabin', sans-serif;
+	color: black;
+}
+
+.header {
+	display: flex;
+  	justify-content: center; /* horizontal */
+  	align-items: center;
+	margin-bottom: 10px;
+	width:100%;
+	font-size:3em;
+    font-weight: 700;
+	-webkit-text-stroke: 1px black;
+	text-shadow:
+    2px 2px 0 #000,
+    /* Simulated effect for Firefox and Opera
+       and nice enhancement for WebKit */
+   -1px -1px 0 #000,  
+    1px -1px 0 #000,
+   -1px  1px 0 #000,
+    1px  1px 0 #000;
+}
+
+.sidenav {
+  height: 100%; /* Full-height: remove this if you want "auto" height */
+  width: 320px; /* Set the width of the sidebar */
+  position: fixed; /* Fixed Sidebar (stay in place on scroll) */
+  z-index: 1; /* Stay on top */
+  top: 0; /* Stay at the top */
+  left: 0;
+  background-color: #111; /* Black */
+  overflow-x: hidden; /* Disable horizontal scroll */
+  padding-top: 20px;
+}
+
+/* The navigation menu links */
+.sidenav a {
+  padding: 6px 8px 6px 16px;
+  text-decoration: none;
+  font-size: 16px;
+  color: #818181;
+  display: block;
+}
+
+/* When you mouse over the navigation links, change their color */
+.sidenav a:hover {
+  color: #f1f1f1;
+}
+
+/* Style page content */
+.main {
+  margin-left: 320px; /* Same as the width of the sidebar */
+  padding: 0px 10px;
+}
+
+/* On smaller screens, where height is less than 450px, change the style of the sidebar (less padding and a smaller font size) */
+@media screen and (max-height: 450px) {
+  .sidenav {padding-top: 15px;}
+  .sidenav a {font-size: 18px;}
+}
+
+.main h1 {
+    scroll-margin-top: 10px;
+}
+
+.coffee-button {
+  position: fixed;    /* stays in place on scroll */
+  top: 20px;          /* distance from the top */
+  right: 20px;        /* distance from the right */
+  z-index: 9999;      /* on top of other elements */
+}
+
+.blender-image {
+    max-width: 500px;
+}
+
+.blender-image-large {
+    max-width: 1000px;
+}
+
+.question {
+    font-weight: bold;
+    font-style: italic;
+}
