@@ -29,12 +29,14 @@
   <a href="#section4">Adding Sunlight</a>
   <a href="#section5">UV Unwrapping</a>
   <a href="#section5a">Day Texture Baking</a>
+  <a href="#section14">Baking "Backlit" Textures</a>
+  <a href="#section7">OOTP Specific Textures</a>
   <a href="#section10">Save a Copy for Night Baking</a>
   <a href="#section6">Using The Baked Image</a>
   <a href="#section13">Exporting the OBJ file</a>
   <a href="#section11">Setting Up Night Lighting</a>
   <a href="#section12">Night Texture Baking</a>
-  <a href="#section7">Excluding Textures From Baking</a>
+  
   <a href="#section8">Troubleshooting / FAQ</a>
   <a href="#section9">Resources & Files</a>
 </div>
@@ -46,7 +48,8 @@
     <img src=".\images\sketchup_white.jpg" class="blender-image">
     <p>Additionally, you'll want to compartmentalize the model as much as possible by enclosing things inside named components.  Each component will be baked separately, so the more components you have, the more detail you'll be able to get.  <i>Do not nest components.</i>  You can have multiple instances of the same component, but I find that adds unnecessary complexity to the baking process for minimal gain.  <i><b>The exception to this is stadium lighting.</b></i>  While it's irrelevant for the "daytime" bake, it works better for the way Blender handles light emission for each light source to be its own component.  It will add steps to the baking process, but it's not terrible.</p>
     <img src=".\images\sketchup_components.jpg" class="blender-image">
-    <p>There are likely going to be a few faces that you will want to exclude from the baking process - things like LED Ribbons, crowds, live scoreboards, backlight signs, etc.  I recommend just putting all of those faces into a "no_bake" component to keep things organized.</p>
+    <p>There are going to be two types of faces that you will want to avoid baking - crowds and "live" scoreboards.  Since those can be replaced by OOTP, baking them is not only unnecessary but actually causes problems for the game engine.  I would recommend putting those in a "do_not_bake" component to keep things organized.</p>
+    <p>There are other components that are perfectly fine to bake 9and in , but you won't want them to react to ambient lighting - think of things like LED ribbons, backlit advertisements, that sort of thing.  I suggest putting those into components with a "lit_" prefix, so "lit_advertisements" or "lit_led_ribbon", etc.  The baking process is a tiny bit different for those, and I'll detail the differences below.</p>
 
     <h1 id="section2">Blender Pre-Requisites</h1>
 
@@ -77,8 +80,8 @@
     <img border=0 width=624 height=335
     src=".\images\image061.jpg"></p>
 
-    <p>The UV Editor is to the left, the 3D Viewport is to the
-    right of that, and the Shader Editor is below the 3D Viewport.  You will also
+    <p>In this view, the UV Editor is to the left, the 3D Viewport is to the
+    right of that, and the Shader Editor is below the 3D Viewport, but you can arrange them as you wish.  You will also
     see a couple of panels to the right side of the screen.  Blender classes both
     of these as “Data” views.  The top one is set to the “Outliner” panel, which
     shows a hierarchical view of the components, materials, and other assets in
@@ -188,9 +191,9 @@
     src=".\images\image068.jpg"></p>
 
     <p>From the Face menu in the 3D Viewport, choose “Triangles to
-    Quads”, which will help limit the number of faces we're dealing with.<br>
-    
-</p>
+    Quads”, which will help limit the number of faces we're dealing with.</p>
+
+    <p>You may also wish to go to the "Edge" menu and choose "Mark Seams." That will convert every selected edge into a seam, which is what Blender use to unwrap.  This works best if your component consists of a lot of large, simple shapes.  Things like a component consisting of rectangular ads.  If you want to get <i>really</i> precise you can manually select the edges you want to mark as seams by pressing the "2" key in Edit mode.  That will shift into "Edge" select mode, and then...you can select the specific edges that you wish to mark as seams.</p>
 
     <p>Over in the UV Editor, click the Image menu and choose
     “New.”  Give the new image a name.  Because this is the daytime render of the
@@ -219,7 +222,8 @@
     <img border=0 width=624 height=644
     src=".\images\image070.jpg"></p>
 
-    <p>Now we're getting someplace!  The next step is telling
+    <p>If you're satisfied with the unwrapping, cool!  If not you can mark or clear seams from the Edge menu and just re-do the Smart UV project.</p>
+    <p>The next step is telling
     Blender what to bake where.<br>
 
     <h1 id="section5a">Day Texture Baking</h1>
@@ -381,8 +385,26 @@
     <img border=0 width=624 height=375
     src=".\images\image074.jpg"><br>
     <br>Repeat this process for every component you wish to bake.<br>
-    <br>There will probably be elements you don't want to bake shadows into, such as backlight signs, LED ribbons, and the crowd (since we'll be replacing that texture with the 3D crowd anyways).  There is a section below detailing what to do for those.<br>
+    <br>There will probably be elements you don't want to bake shadows into, such as backlight signs, LED ribbons, and the crowd (since we'll be replacing that texture with the 3D crowd anyways).  See the next section on that.<br>
     <br>I would suggest you save your work after each successful bake to make it easier to revert back.
+
+    <h1 id="14">Baking "Backlit" Textures</h1>
+    <p>As I mentioned earlier, there are some textures where baking is perfectly fine but you won't want them to react to ambient lighting.  The UV unwrapping and baking process is the same with two minor changes.</p>
+
+    <p>Set the Bake to Diffuse, but <i>uncheck</i> the "Direct" and "Indirect" checkboxes.  That will cause Blender to bake the texture without any lighting effects.</p>
+
+    <img src=".\images\image096.jpg">
+
+    <p>Optionally, set the Max Samples to something really low.  1 is fine.  Since we're not dealing with any lighting, there's no benefit to slowing the bake down.</p>
+
+    <img src=".\images\image096.jpg">
+
+    <p>Other than that, the process is the same.</p>
+
+    <h1 id="section7">OOTP Specific Textures</h1>
+    <p>OOTP, as you probably know, handles 3D crowds and live scoreboards by actively replacing the textures.  To avoid odd behavior, you'll want to exclude these from the baking process.  Baking them will just cause problems for OOTP as the wrapping will just confuse the game engine, so it's better to just skip these entirely.</p>
+
+    <p>For the live scoreboard you may need to place a dummy texture in the model's folder and point the MTL file to that.  The crowd textures you just replace in the MTL the same way we've been doing for years now.</p>
 
     <h1 id="section10">Save a Copy for Night Baking</h1>
     <p>Up until this point, everything we've done has been with a "daytime" bake of the model in mind.  But it's entirely likely that your ballpark will also need a nighttime bake.  Since the steps in the next section will replace the model's textures with the baked textures, we'll need to have a separate "clone" of the model for the nighttime bake, and <i>this is the best time to do that</i>.  That way, you'll have a copy of the model with all of the UV unwrapping done, but nothing permanently baked into the model.</b></i></p>
@@ -479,11 +501,15 @@
 
     <p>Now is when we open up that _night model we saved before applying all of the daytime baked textures.  File &rarr; Open &rarr; (modelname)_night.blend</p>
 
-    <p>The first thing we have to do is get rid of the sunlight we added at the beginning, since it's no longer daytime.  In the Properties panel, click the “World” tab.  Click the "Sky Texture" and choose either "Remove" or "Disconnect."</p>
+    <p>The first thing we have to do is dial down the sunlight so that it's just providing a bare minimum of ambient light - that will prevent any textures that aren't getting stadium lighting from rendering <i>completely</i> black.  In the World tab, set the Sun Intensity down really low - I just set it all the way to 0.  Set the Sun Elevation to 90° and the Strength down to something like 0.02 or 0.03.</p>
 
-    <img src=".\images\image087.jpg">
+    <img src=".\images\image098.jpg">
 
-    <p>If your 3D Viewport is sent to "Rendered" you'll notice that all the light has gone away.  The next step is to get the light towers to actually emit light.</p>
+    <p>If your 3D Viewport is sent to "Rendered" you'll notice that the light has gone <i>almost</i> entirely away.</p>
+
+    <img src=".\images\image099.jpg">
+    
+    <p></p>The next step is to get the light towers to actually emit light.</p>
 
     <p>In Object mode, select the light source you want to work with and then go into Edit mode.  Make sure you're in "Face Select" mode (press the "3" key) and select the face that have the "light" texture:</p>
 
@@ -495,7 +521,7 @@
 
     <img src=".\images\image091.jpg">
 
-    <p>If you want more granular control over the lighting, you can create a new material slot inside a component to act as the emitter.</p>
+    <p>If you want more granular control over the lighting, you can create a new material slot inside each component to act as an emitter.</p>
 
     <p>In Edit mode, make sure the faces containing the light's texture are selected.  Then, in the Materials tab, add a new material slot by clicking the plus sign next to the list of materials.  Give it a distinctive name such as "floodlights_1".  Then click "Assign" to assign that material to the selected face(s).  When you do that, the face will just become a blank white space which is good enough for our purposes.</p>
 
@@ -513,7 +539,13 @@
 
     <h1 id="section12">Night Texture Baking</h1>
 
-    <p>Since you've already UV Unwrapped your components, baking the night texture follows the same procedure as the day bake.  Everything is already set up, in fact!  Internally, Blender will usethe same bake target images we created earlier.</p>
+    <p>Since you've already UV Unwrapped your components, baking the night texture follows the same procedure as the day bake.  Everything is already set up, in fact!  Internally, Blender will use the same bake target images we created earlier.</p>
+
+    <p>There is one thing you'll have to pay attention to, and that's shared materials.  SketchUp can reuse the same texture file in multiple components.  So if you use a concrete texture for the concourse and also use it in the scoreboard (like I do in the tutorial model), every time you set up the shader, it will ripple out and affect every other instance of that material.  Blender makes it pretty obvious when there are issues by highlighting them in red:</p>
+
+    <img src=".\images\image095.jpg">
+
+    <p>All you need to do is adjust the highlighted materials to be consistent with the rest of the materials within the component.</p>
 
     <p>The only difference - once you've finished baking and if you like what you see, <b>save the image with the _night name</b>.  As before, Blender does not automatically save the image. So in the UV Editor, just choose "Image &rarr; Save As."</p>
 
@@ -525,9 +557,7 @@
 
     <p>When you're done, you'll have day and night textures ready to go!</p>
 
-    <h1 id="section7">Excluding Textures From Baking</h1>
-    <p>There are <i>definitely</i> going to be some textures that you will not want to bake - you may remember I recommended a "no_bake" component to contain those textures.</p>
-    <p>The problem is that Blender's OBJ exporter won't actually export textures that have not been mapped using the above technique - notice that the baked model's folder only contains the field_day.jpg image, and none of the other textures that are in the model.  This has to do with the way Blender handles images, and it's kind of a pain.  Ultimately, the simplest thing to do is to use SketchUp for this - copy that "no_bake" component into a new model and just export <i>that</i> model to an OBJ file.  Then copy the files from that model's textures folder into the baked model's folder.  You may also need to edit the filenames to match what the .mtl file Blender exported says, or edit the .mtl file to match the filenames.</p>
+    <p>As a side note, you can skip re-baking any of the "lit_" components.  Since OOTP only loads the night texture if it finds one, just having the day texture works fine.</p>
     
     <h1 id="section8">Troubleshooting / FAQ</h1>
     <p class="question">As I go through the components, sometimes the materials already seem to have UV Maps and bake images assigned to them and have some things highlighted in red, why?</p>
