@@ -580,14 +580,28 @@
     <p class="question">After baking a texture, I clearly miscalculated how large the bake target needs to be.  How can I fix that?</p>
     <p>In the UV Editor, just click on Image &rarr; Resize and enter your new desired size.  The image will scale up or down accordingly.  Then simply re-run the bake and it will bake to the new size.
 
+    <p class="question">Smart UV troubleshooting</p>
+    <p>Occasionally the Smart UV in default settings struggles with long and thin surfaces so clicking the auto-scaling or changing to horizontal or auto-axis aligning resolves this issue. (Deft)</p>
+
+    <p class="question">Fixing Sketchup Issues after Importing into Blender</p>
+    <p>If you have a component that is not what you want went in blender, you can delete the component from your blender file, and reimport the updated sketchup file. It will show up as a new Loose Entity (Loose Entity.001 usually). You can delete the top level new mesh (Loose Entity.001) and the sub-meshes will collapse into the original imported meshes. Find the new component you want to modify and follow the regular operations and then delete all of the new duplicated component usually identified with .001 suffix. (Deft)</p>
+
     <h1 id="section9">Resources & Files</h1>
     <p><a href="./files/tutorial.skp">SketchUp Tutorial Model</a></p>
     <p><a href="./files/tutorial.blend">Blender Tutorial Model (Day)</a></p>
     <p><a href="./files/tutorial_night.blend">Blender Tutorial Model (Night)</a></p>
-    <p><a href="https://archive.org/details/sketchupmake-2017-2-2555-90783-pt-br-x64">SketchUp Make 2017 installer</a></p>
+    <p><a href="https://archive.org/details/sketchupmake-2017-2-2555-90783-pt-br-x64">SketchUp Make 2017 installer (Windows)</a></p>
     <p><a href="./files/OBJexporter.zip">OBJ Exporter plugin for SketchUp</a></p>
     <p><a href="https://www.blender.org/" target="_blank">Blender Website</a></p>
     <p><a href=https://github.com/RedHaloStudio/Sketchup_Importer/releases/p" target="_blank">SketchUp Import Plugin for Blender</a>
+    <p><a href="./files/ootp-ballpark-toolkit.zip">OOTP Ballpark Tookit</a></p>
+    <blockquote>A couple of useful scripts pacakged as a Blender add-on.  It will add an "OOTP" menu into the 3D Viewport when you are in Object mode with the following two actions:  
+      <ol>
+        <li><i>Clean Scene & Isolate Materials</i>.  This will loop through all of your components and make the materials in each component unique to that component so that you don't have to keep changing things in the Shader editor every time you come across a shared texture.  It will also remove all of the "DefaultMaterial" instances it comes across.</li><br>
+        <li><i>Clone Nodes to Component Materials</i>. This will clone the selected nodes in the Shader editor to all of the other materials in the selected component.  So after you've added the UV Maps and bake target nodes to a material, select them all and then run that script to instantly duplicate those nodes throughout the component.  You'll still have to go through and re-link the nodes for each material, but it's a start.</li>
+      </ol>
+    There may be more in the future, but these are the convenience things I've done so far.
+    </blockquote>
 </div>
 </body>
 </html>
