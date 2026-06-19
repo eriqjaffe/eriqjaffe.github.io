@@ -152,7 +152,9 @@
     <p>To make things easier on your computer once you're happy
     with the lighting, you can go back to “Material Preview” from that “Z” menu in
     the 3D Viewport.  That will show you the textures without any lighting effects
-    so it's easier on the system since it's not doing any real-time rendering.<br>
+    so it's easier on the system since it's not doing any real-time rendering.</p>
+
+<p>As a side note, there is also a <a href="https://extensions.blender.org/add-ons/sun-position" target="_blank">"Sun Position" addon</a> for Blender which uses location, date, and time of day to help generate accurate real-worl shadows.</p>
     
     <h1 id="section5">UV Unwrapping</h1>
     In order to properly bake textures, the first thing we need to do is what's known as UV Unwrapping.  Basically, what that does is take all of the selected faces and map them onto a flat image.  When that UV Map is applied to the same faces, the image is "wrapped" around the faces.  This is utlimately how OOTP's included 3D Models work, but the SketchUp model's UVs will be an overlaping mess (we'll see that below) so we need to properly properly unwrap the mesh in order to bake.<br>
