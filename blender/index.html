@@ -603,10 +603,12 @@
     <p><a href="https://www.blender.org/" target="_blank">Blender Website</a></p>
     <p><a href=https://github.com/RedHaloStudio/Sketchup_Importer/releases/p" target="_blank">SketchUp Import Plugin for Blender</a>
     <p><a href="./files/ootp-ballpark-toolkit.zip">OOTP Ballpark Tookit</a></p>
-    <blockquote>A couple of useful scripts pacakged as a Blender add-on.  It will add an "OOTP" menu into the 3D Viewport when you are in Object mode with the following two actions:  
+    <blockquote>A couple of useful scripts pacakged as a Blender add-on.  It will add an "OOTP" menu into the 3D Viewport when you are in Object mode with the following  actions:  
       <ol>
         <li><i>Clean Scene & Isolate Materials</i>.  This will loop through all of your components and make the materials in each component unique to that component so that you don't have to keep changing things in the Shader editor every time you come across a shared texture.  It will also remove all of the "DefaultMaterial" instances it comes across.</li><br>
         <li><i>Clone Nodes to Component Materials</i>. This will clone the selected nodes in the Shader editor to all of the other materials in the selected component.  So after you've added the UV Maps and bake target nodes to a material, select them all and then run that script to instantly duplicate those nodes throughout the component.  You'll still have to go through and re-link the nodes for each material, but it's a start.</li>
+        <li><i>Set Up OOTP Material</i>.  This will help speed up the importing of the baked textures by deleting all material slots from the selected component and create a new material slot with a UV Map and Image node already in there and linked.  All you should have to do is load up the baked texture into the Image node and it should immediately be visible in the model (well, assuming you're in Material Preview or Rendered view).</li>
+        <li><i>Export Ballpark to OOTP</i>.  This will export the OBJ (defaulting to the same directory and filename as your Blender model) and MTL files, with the Path Mode set to "Copy."  It will then also edit the .MTL file to replace the crowd textures with the relevant OOTP crowd textures.  This assumes your crowd texture materials are named properly.  At the very least, it works for me.  If your crowd textures don't match, then they won't get edited.</li>
       </ol>
     There may be more in the future, but these are the convenience things I've done so far.
     </blockquote>
