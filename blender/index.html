@@ -156,11 +156,7 @@
     <h1 id="section5">UV Unwrapping</h1>
     In order to properly bake textures, the first thing we need to do is what's known as UV Unwrapping.  Basically, what that does is take all of the selected faces and map them onto a flat image - in fact, "U" and "V" simply refer to the axes of the 2D texture, similar to how "X" and "Y" are used with graphs.  When that UV Map is applied to the same faces, the image is "wrapped" around the faces.  This is how OOTP's included 3D models and uniform textures work, but SketchUp's exported UVs are an overlaping mess (we'll see that below) so we need to properly properly unwrap each mesh in order to bake.<br>
     <br>
-    First, in the 3D Viewport, make sure you are in “Object” mode from the menu at the top left of the pane.<br>
-    <br>
-    <img src=".\images\image004.jpg"><br>
-    <br>
-    Then, from the list of “SKP Mesh Objects” in the Outliner, choose the component you
+    First, in the 3D Viewport, make sure you are in “Object” mode.  Then, from the list of “SKP Mesh Objects” in the Outliner, choose the component you
     want to bake.  For this demonstration I will start with the “C-field”
     component.  Click that in the Outliner and you'll see the field component
     highlighted in orange in the 3D Viewport:<br>
