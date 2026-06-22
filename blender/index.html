@@ -582,6 +582,9 @@
     <img src=".\images\image083.jpg">&nbsp;<img src=".\images\image086.jpg" style="height:350px;">&nbsp;<img src=".\images\image085.jpg">
     <p>Then try baking again.</p>
 
+    <p class="question">During a bake, I get a "circular dependency error" message.</p>
+    <p>That means you have the wrong image node selected in the Shader editor, and Blender is trying to bake to the source image instead of the target image.  That creates a loop, thus a circular dependency error.</p>
+    
     <p class="question">During a bake, I got a message saying "No active and selected image texture node found in material "material name" for object "component name".  What does that mean?</p>
     <p>Simply put, that means that the bake target image is not specified for that material.  Go back through the materials list for your component and ensure that the bake target image is selected and highlighted in white.</p>
     <img border=0 width=624 height=231
