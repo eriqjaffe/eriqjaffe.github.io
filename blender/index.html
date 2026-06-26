@@ -599,6 +599,14 @@
     <p class="question">Smart UV troubleshooting</p>
     <p>Occasionally the Smart UV in default settings struggles with long and thin surfaces so clicking the auto-scaling or changing to horizontal or auto-axis aligning resolves this issue. (Deft)</p>
 
+    <p class="question">When doing a night bake, some of the sufaces have a noticeable "noise" or "speckling" in the baked texture.</p>
+
+    <img width=250 src=".\images\image101.jpg">
+
+    <p>These are known in Blender circles as "fireflies."  In my experience it has to do with the strength of the emitters and the light bouncing off surfaces causing these hotspots.  You <i>can</i> lower the strength of the emitters, but that may produce bakes that appear too dark.  For our purposes I find the best way to minimize these is to go into the Render properties, expand Light Paths &rarr; Max Bounces and lower the "Total" and "Diffuse" values from their default values of 12 and 4.  I find that setting them to 4 and 1, respectively, resolves the issue.</p>
+
+    <img src=".\images\image102.jpg">
+
     <p class="question">Fixing Sketchup Issues after Importing into Blender</p>
     <p>If you have a component that is not what you want went in blender, you can delete the component from your blender file, and reimport the updated sketchup file. It will show up as a new Loose Entity (Loose Entity.001 usually). You can delete the top level new mesh (Loose Entity.001) and the sub-meshes will collapse into the original imported meshes. Find the new component you want to modify and follow the regular operations and then delete all of the new duplicated component usually identified with .001 suffix. (Deft)</p>
 
