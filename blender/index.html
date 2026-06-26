@@ -618,8 +618,8 @@
     <p><a href="https://www.blender.org/" target="_blank">Blender Website</a></p>
     <p><a href="https://github.com/RedHaloStudio/Sketchup_Importer/releases/p" target="_blank">SketchUp Import Plugin for Blender</a>
     <p><a href="https://extensions.blender.org/add-ons/sun-position" target="_blank">Sun Position addon for Blender</a></p>
-    <p><a href="./files/ootp-ballpark-toolkit.zip">OOTP Ballpark Toolkit</a></p>
-    <blockquote>A couple of useful scripts (admittedly writen with AI assistance) pacakged as a Blender add-on.  It will add an "OOTP" menu into the 3D Viewport when you are in Object mode with the following  actions:  
+    <p><a href="./files/ootp-ballpark-toolkit.py">OOTP Ballpark Toolkit</a></p>
+    <blockquote>A couple of useful scripts (admittedly writen with AI assistance) you can install the same way you install other add-ons.  It will add an "OOTP" menu into the 3D Viewport when you are in Object mode with the following  actions:  
       <ol>
         <li><i>Prepare Model</i>.  A handy one-click script that will loop through all of your components and perform the following:<br><br>
           <ul>
@@ -628,6 +628,7 @@
             <li>Creates a named UV Map for each component and sets them up for UV Unwrapping as described above.</li><br>
             <li>Creates a named 1024x1024 image for each component to act as a bake target.  The image name is the component name with "_bake" appended as a placeholder and to ensure it won't conflict with any existing files.</li><br>
             <li>Iterates through each component's materials and wires up the Shader editor properly as described above.</li>
+            <li>Creates a Sky Texture using my preferred default settings.</li>
           </ul><br>
         This will skip any components with "nobake" in the name.</li><br>
         <li><i>Clone Nodes to Component Materials</i>. This will clone the selected nodes in the Shader editor to all of the other materials in the selected component.  So after you've added the UV Maps and bake target nodes to the material material in a component, select them all and then run that script to instantly duplicate those nodes throughout the component.  You'll still have to go through and re-link the nodes for each material, but it's still faster than copying and pasting.  Likely not needed if the "Prepare Model" script works as expected.</li><br>
