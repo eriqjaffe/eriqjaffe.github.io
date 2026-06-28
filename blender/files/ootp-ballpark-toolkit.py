@@ -110,6 +110,7 @@ class OOTP_OT_scene_cleaner(bpy.types.Operator):
 
                 # Create Blank Bake Target Image
                 clean_img_name = f"{display_name.replace(' ', '_')}_bake"
+
                 if clean_img_name not in bpy.data.images:
                     bake_image = bpy.data.images.new(
                         name=clean_img_name,
@@ -118,6 +119,10 @@ class OOTP_OT_scene_cleaner(bpy.types.Operator):
                         alpha=True
                     )
                     bake_image.generated_color = (0.0, 0.0, 0.0, 0.0)
+                    
+                    # CRUCIAL FIX: Do NOT use pack() or fake filepaths on empty images.
+                    # Instead, tell Blender to NEVER clear this image from RAM, even if unlinked.
+                    bake_image.use_fake_user = True
                 else:
                     bake_image = bpy.data.images[clean_img_name]
 
@@ -339,15 +344,24 @@ class WM_OT_ootp_ballpark_exporter(bpy.types.Operator, ExportHelper):
                                         # Fallback if save_render fails
                                         pass
         
+        for img in bpy.data.images:
+            if img.is_dirty and img.packed_file is None:  # If it's a newly baked/unsaved image
+                # Save it temporarily to your blend file directory so it has a path
+                base_path = bpy.path.abspath("//")
+                if base_path:
+                    img.filepath_raw = os.path.join(base_path, img.name)
+                    img.save()
+            
         bpy.ops.wm.obj_export(
             filepath=obj_filepath,
-            export_selected_objects=False,  # Set to True if you only want selected exported
+            export_selected_objects=False,   
             export_animation=False,
-            export_pbr_extensions=False,    # Keeps standard MTL format readable by OOTP
-            path_mode='COPY',               
+            export_materials=True,           
+            export_pbr_extensions=False,     # Standard format for OOTP compatibility
+            path_mode='COPY',                # Now it will successfully find and copy the files!
             forward_axis='NEGATIVE_Z',       
             up_axis='Y',
-            export_triangulated_mesh=True   # Locks in the triangulated faces auto-fix
+            export_triangulated_mesh=True    
         )
         
         if os.path.exists(mtl_filepath):
