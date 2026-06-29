@@ -1,7 +1,7 @@
 bl_info = {
     "name": "OOTP Ballpark Toolkit",
     "author": "Eriq Jaffe",
-    "version": (0, 4),
+    "version": (0, 5),
     "blender": (4, 0, 0),
     "location": "3D Viewport > Main Top Bar (Next to Object Menu)",
     "description": "Custom workflow utilities for Out of the Park Baseball stadium creation.",
@@ -110,6 +110,7 @@ class OOTP_OT_scene_cleaner(bpy.types.Operator):
 
                 # Create Blank Bake Target Image
                 clean_img_name = f"{display_name.replace(' ', '_')}_bake"
+
                 if clean_img_name not in bpy.data.images:
                     bake_image = bpy.data.images.new(
                         name=clean_img_name,
@@ -118,6 +119,10 @@ class OOTP_OT_scene_cleaner(bpy.types.Operator):
                         alpha=True
                     )
                     bake_image.generated_color = (0.0, 0.0, 0.0, 0.0)
+                    
+                    # CRUCIAL FIX: Do NOT use pack() or fake filepaths on empty images.
+                    # Instead, tell Blender to NEVER clear this image from RAM, even if unlinked.
+                    bake_image.use_fake_user = True
                 else:
                     bake_image = bpy.data.images[clean_img_name]
 
@@ -135,6 +140,7 @@ class OOTP_OT_scene_cleaner(bpy.types.Operator):
                         
                     source_tex_node = next((n for n in nodes if n.type == 'TEX_IMAGE' and n.label != "Bake Target"), None)
                     output_node = next((n for n in nodes if n.type == 'OUTPUT_MATERIAL'), None)
+                    principled_node = next((n for n in nodes if n.type == 'BSDF_PRINCIPLED'), None)
                     
                     if output_node:
                         right_x = output_node.location.x + 200
@@ -152,6 +158,9 @@ class OOTP_OT_scene_cleaner(bpy.types.Operator):
                     else:
                         uv_src_node.location = (right_x - 600, right_y)
                         
+                    if source_tex_node and principled_node:
+                        links.new(source_tex_node.outputs['Alpha'], principled_node.inputs['Alpha'])
+                        
                     uv_tgt_node = nodes.new(type='ShaderNodeUVMap')
                     uv_tgt_node.uv_map = target_uv.name
                     uv_tgt_node.location = (right_x, right_y)
@@ -165,6 +174,154 @@ class OOTP_OT_scene_cleaner(bpy.types.Operator):
                     
                     tgt_tex_node.select = True
                     nodes.active = tgt_tex_node
+
+        self.report({'INFO'}, f"Processed {mesh_count} components. All UV maps, bakes, and target nodes configured!")
+        return {'FINISHED'}
+        
+# ====================================================================
+# OPERATOR 1a: Selected Object Cleanup
+# ====================================================================
+class OOTP_selected_scene_cleaner(bpy.types.Operator):
+    """Purge DefaultMaterial geometry and isolate valid textures for selected object(s)"""
+    bl_idname = "ootp.object_cleaner"
+    bl_label = "Clean Scene & Isolate Materials for Selected Object(s)"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    def execute(self, context):
+        if bpy.ops.object.mode_set.poll():
+            bpy.ops.object.mode_set(mode='OBJECT')
+
+        selected_meshes = [obj for obj in context.selected_objects if obj.type == 'MESH']
+        
+        if not selected_meshes:
+            print("Warning: No mesh objects were selected.")
+        else:
+            mesh_count = 0
+            for obj in context.scene.objects:
+                if "nobake" in obj.name.lower():
+                    continue
+                
+                if obj.type == 'MESH':
+                    mesh_count += 1
+                    display_name = obj.name
+                    if display_name.startswith("C-"):
+                        display_name = display_name.replace("C-", "", 1)
+                        
+                    mesh = obj.data
+                    default_slot_indices = [i for i, slot in enumerate(obj.material_slots) if slot.material and slot.material.name == "DefaultMaterial"]
+                    
+                    # Purge Geometry
+                    if default_slot_indices:
+                        faces_to_delete = [f.index for f in mesh.polygons if f.material_index in default_slot_indices]
+                        
+                        if faces_to_delete:
+                            context.view_layer.objects.active = obj
+                            bpy.ops.object.mode_set(mode='EDIT')
+                            bpy.ops.mesh.select_all(action='DESELECT')
+                            bpy.ops.object.mode_set(mode='OBJECT')
+                            for f_idx in faces_to_delete:
+                                mesh.polygons[f_idx].select = True
+                                
+                            bpy.ops.object.mode_set(mode='EDIT')
+                            bpy.ops.mesh.delete(type='FACE')
+                            bpy.ops.object.mode_set(mode='OBJECT')
+                        
+                        for idx in sorted(default_slot_indices, reverse=True):
+                            obj.active_material_index = idx
+                            bpy.ops.object.material_slot_remove()
+                            
+                    # UV Maps Setup
+                    if not mesh.uv_layers:
+                        source_uv = mesh.uv_layers.new(name="UVMap")
+                    else:
+                        source_uv = next((layer for layer in mesh.uv_layers if layer.active_render), mesh.uv_layers[0])
+                    
+                    source_uv.active_render = True
+                    
+                    if display_name not in mesh.uv_layers:
+                        target_uv = mesh.uv_layers.new(name=display_name)
+                    else:
+                        target_uv = mesh.uv_layers[display_name]
+        
+                    mesh.uv_layers.active = target_uv
+
+                    # Material Splitting
+                    for slot in obj.material_slots:
+                        if slot.material:
+                            orig_name = slot.material.name
+                            if "." in orig_name and orig_name.split(".")[-1].isdigit():
+                                orig_name = ".".join(orig_name.split(".")[:-1])
+                            
+                            new_mat = slot.material.copy()
+                            new_mat.name = f"{orig_name}_{display_name}"
+                            slot.material = new_mat
+
+                    # Create Blank Bake Target Image
+                    clean_img_name = f"{display_name.replace(' ', '_')}_bake"
+
+                    if clean_img_name not in bpy.data.images:
+                        bake_image = bpy.data.images.new(
+                            name=clean_img_name,
+                            width=1024,
+                            height=1024,
+                            alpha=True
+                        )
+                        bake_image.generated_color = (0.0, 0.0, 0.0, 0.0)
+                        
+                        # CRUCIAL FIX: Do NOT use pack() or fake filepaths on empty images.
+                        # Instead, tell Blender to NEVER clear this image from RAM, even if unlinked.
+                        bake_image.use_fake_user = True
+                    else:
+                        bake_image = bpy.data.images[clean_img_name]
+
+                    # Add and Wire Shader Bake Nodes
+                    for slot in obj.material_slots:
+                        mat = slot.material
+                        if not mat or not mat.use_nodes:
+                            continue
+                            
+                        nodes = mat.node_tree.nodes
+                        links = mat.node_tree.links
+                        
+                        for node in nodes:
+                            node.select = False
+                            
+                        source_tex_node = next((n for n in nodes if n.type == 'TEX_IMAGE' and n.label != "Bake Target"), None)
+                        output_node = next((n for n in nodes if n.type == 'OUTPUT_MATERIAL'), None)
+                        principled_node = next((n for n in nodes if n.type == 'BSDF_PRINCIPLED'), None)
+                        
+                        if output_node:
+                            right_x = output_node.location.x + 200
+                            right_y = output_node.location.y
+                        else:
+                            right_x = 600
+                            right_y = 300
+
+                        uv_src_node = nodes.new(type='ShaderNodeUVMap')
+                        uv_src_node.uv_map = source_uv.name
+                        
+                        if source_tex_node:
+                            links.new(uv_src_node.outputs['UV'], source_tex_node.inputs['Vector'])
+                            uv_src_node.location = (source_tex_node.location.x - 300, source_tex_node.location.y)
+                        else:
+                            uv_src_node.location = (right_x - 600, right_y)
+                            
+                        if source_tex_node and principled_node:
+                            links.new(source_tex_node.outputs['Alpha'], principled_node.inputs['Alpha'])
+                            
+                        uv_tgt_node = nodes.new(type='ShaderNodeUVMap')
+                        uv_tgt_node.uv_map = target_uv.name
+                        uv_tgt_node.location = (right_x, right_y)
+                        
+                        tgt_tex_node = nodes.new(type='ShaderNodeTexImage')
+                        tgt_tex_node.image = bake_image
+                        tgt_tex_node.label = "Bake Target"
+                        tgt_tex_node.location = (right_x + 300, right_y)
+                            
+                        links.new(uv_tgt_node.outputs['UV'], tgt_tex_node.inputs['Vector'])
+                        
+                        tgt_tex_node.select = True
+                        nodes.active = tgt_tex_node
 
         self.report({'INFO'}, f"Processed {mesh_count} components. All UV maps, bakes, and target nodes configured!")
         return {'FINISHED'}
@@ -226,7 +383,6 @@ class OOTP_OT_node_cloner(bpy.types.Operator):
 # ====================================================================
 # OPERATOR 3: Replace all materials with baked materials where applicable
 # ====================================================================
-
 class OOTP_replace_all_materials(bpy.types.Operator):
     """Replace all materials with baked materials, where applicable"""
     bl_idname = "ootp.replace_all_materials"
@@ -270,7 +426,7 @@ class OOTP_replace_all_materials(bpy.types.Operator):
                 if active_uv:
                     node_uvmap.uv_map = active_uv.name
 
-                clean_img_name = f"{mat_name.replace(' ', '_')}_day.png"
+                clean_img_name = f"{mat_name.replace(' ', '_')}_day.webp"
                 
                 if bpy.data.is_saved:
                     blend_dir = os.path.dirname(bpy.data.filepath)
@@ -339,15 +495,24 @@ class WM_OT_ootp_ballpark_exporter(bpy.types.Operator, ExportHelper):
                                         # Fallback if save_render fails
                                         pass
         
+        for img in bpy.data.images:
+            if img.is_dirty and img.packed_file is None:  # If it's a newly baked/unsaved image
+                # Save it temporarily to your blend file directory so it has a path
+                base_path = bpy.path.abspath("//")
+                if base_path:
+                    img.filepath_raw = os.path.join(base_path, img.name)
+                    img.save()
+            
         bpy.ops.wm.obj_export(
             filepath=obj_filepath,
-            export_selected_objects=False,  # Set to True if you only want selected exported
+            export_selected_objects=False,   
             export_animation=False,
-            export_pbr_extensions=False,    # Keeps standard MTL format readable by OOTP
-            path_mode='COPY',               
+            export_materials=True,           
+            export_pbr_extensions=False,     # Standard format for OOTP compatibility
+            path_mode='COPY',                # Now it will successfully find and copy the files!
             forward_axis='NEGATIVE_Z',       
             up_axis='Y',
-            export_triangulated_mesh=True   # Locks in the triangulated faces auto-fix
+            export_triangulated_mesh=True    
         )
         
         if os.path.exists(mtl_filepath):
@@ -446,7 +611,6 @@ class WM_OT_ootp_ballpark_exporter(bpy.types.Operator, ExportHelper):
             self.report({'WARNING'}, "OBJ Exported, but no tracking MTL found to override.")
 
         return {'FINISHED'}
-
 
 # ====================================================================
 # OPERATOR 5: Bake all components that aren't tagged "nobake"
@@ -554,11 +718,12 @@ class OOTP_OT_batch_bake_day(bpy.types.Operator):
                 bpy.ops.object.bake(type='DIFFUSE', save_mode='INTERNAL')
                 
                 # 4. Save and rename the resulting image map asset
-                new_filename = target_image.name.replace("_bake", suffix) + ".png"
+                new_filename = target_image.name.replace("_bake", suffix) + ".webp"
                 save_path = os.path.join(model_dir, new_filename)
                 
                 target_image.filepath_raw = save_path
-                target_image.file_format = 'PNG'
+                target_image.file_format = 'WEBP'
+                bpy.context.scene.render.image_settings.compression = 100
                 target_image.save()
                 
                 print(f"  -> Successfully saved: {save_path}")
@@ -585,6 +750,7 @@ class VIEW3D_MT_ootp_custom_menu(bpy.types.Menu):
         layout = self.layout
         
         layout.operator("ootp.scene_cleaner", text="Prepare Model", icon='FILE_REFRESH')
+        layout.operator("ootp.object_cleaner", text="Prepare Selected Objects", icon='FILE_REFRESH')
         layout.operator("ootp.node_cloner", text="Clone Nodes to Component Materials", icon='DUPLICATE')
         layout.separator()
         layout.operator("ootp.batch_bake", text="Bake All Bakeable Components", icon='RENDER_STILL')
@@ -601,6 +767,7 @@ def draw_menu_header(self, context):
 
 def register():
     bpy.utils.register_class(OOTP_OT_scene_cleaner)
+    bpy.utils.register_class(OOTP_selected_scene_cleaner)
     bpy.utils.register_class(OOTP_OT_node_cloner)
     bpy.utils.register_class(OOTP_replace_all_materials)
     bpy.utils.register_class(WM_OT_ootp_ballpark_exporter)
@@ -615,6 +782,7 @@ def unregister():
     bpy.utils.unregister_class(WM_OT_ootp_ballpark_exporter)
     bpy.utils.unregister_class(OOTP_replace_all_materials)
     bpy.utils.unregister_class(OOTP_OT_node_cloner)
+    bpy.utils.unregister_class(OOTP_selected_scene_cleaner)
     bpy.utils.unregister_class(OOTP_OT_scene_cleaner)
 
 if __name__ == "__main__":
