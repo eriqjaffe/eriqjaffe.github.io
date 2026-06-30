@@ -426,7 +426,7 @@ class OOTP_replace_all_materials(bpy.types.Operator):
                 if active_uv:
                     node_uvmap.uv_map = active_uv.name
 
-                clean_img_name = f"{mat_name.replace(' ', '_')}_day.webp"
+                clean_img_name = f"{mat_name.replace(' ', '_')}_day.png"
                 
                 if bpy.data.is_saved:
                     blend_dir = os.path.dirname(bpy.data.filepath)
@@ -718,12 +718,11 @@ class OOTP_OT_batch_bake_day(bpy.types.Operator):
                 bpy.ops.object.bake(type='DIFFUSE', save_mode='INTERNAL')
                 
                 # 4. Save and rename the resulting image map asset
-                new_filename = target_image.name.replace("_bake", suffix) + ".webp"
+                new_filename = target_image.name.replace("_bake", suffix) + ".png"
                 save_path = os.path.join(model_dir, new_filename)
                 
                 target_image.filepath_raw = save_path
-                target_image.file_format = 'WEBP'
-                bpy.context.scene.render.image_settings.compression = 100
+                target_image.file_format = 'PNG'
                 target_image.save()
                 
                 print(f"  -> Successfully saved: {save_path}")
