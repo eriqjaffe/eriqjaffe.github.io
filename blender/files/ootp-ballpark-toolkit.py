@@ -120,9 +120,7 @@ class OOTP_OT_scene_cleaner(bpy.types.Operator):
                     )
                     bake_image.generated_color = (0.0, 0.0, 0.0, 0.0)
                     
-                    # CRUCIAL FIX: Do NOT use pack() or fake filepaths on empty images.
-                    # Instead, tell Blender to NEVER clear this image from RAM, even if unlinked.
-                    bake_image.use_fake_user = True
+                    bake_image.pack_from_data(bytes(1024 * 1024 * 4)) # Width * Height * RGBA channels
                 else:
                     bake_image = bpy.data.images[clean_img_name]
 
@@ -268,9 +266,7 @@ class OOTP_selected_scene_cleaner(bpy.types.Operator):
                         )
                         bake_image.generated_color = (0.0, 0.0, 0.0, 0.0)
                         
-                        # CRUCIAL FIX: Do NOT use pack() or fake filepaths on empty images.
-                        # Instead, tell Blender to NEVER clear this image from RAM, even if unlinked.
-                        bake_image.use_fake_user = True
+                        bake_image.pack_from_data(bytes(1024 * 1024 * 4)) # Width * Height * RGBA channels
                     else:
                         bake_image = bpy.data.images[clean_img_name]
 
