@@ -120,7 +120,8 @@ class OOTP_OT_scene_cleaner(bpy.types.Operator):
                     )
                     bake_image.generated_color = (0.0, 0.0, 0.0, 0.0)
                     
-                    bake_image.pack_from_data(bytes(1024 * 1024 * 4)) # Width * Height * RGBA channels
+                    data_size = 1024 * 1024 * 4
+                    bake_image.pack(data=bytes(data_size), data_len=data_size)
                 else:
                     bake_image = bpy.data.images[clean_img_name]
 
@@ -266,7 +267,8 @@ class OOTP_selected_scene_cleaner(bpy.types.Operator):
                         )
                         bake_image.generated_color = (0.0, 0.0, 0.0, 0.0)
                         
-                        bake_image.pack_from_data(bytes(1024 * 1024 * 4)) # Width * Height * RGBA channels
+                        data_size = 1024 * 1024 * 4
+                        bake_image.pack(data=bytes(data_size), data_len=data_size)
                     else:
                         bake_image = bpy.data.images[clean_img_name]
 
