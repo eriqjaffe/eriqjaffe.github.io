@@ -49,13 +49,22 @@ class OOTP_OT_scene_cleaner(bpy.types.Operator):
         if bpy.ops.object.mode_set.poll():
             bpy.ops.object.mode_set(mode='OBJECT')
 
+        loose_obj_name = "_(Loose Entity)"
+
+        if loose_obj_name in bpy.data.objects:
+            loose_obj = bpy.data.objects[loose_obj_name]
+            
+            # Rename it to match your automated unwrap filter rules
+            loose_obj.name = "_(Loose Entity)_nobake"
         mesh_count = 0
-        for obj in context.scene.objects:
+        for obj in context.scene.objects:                
             if "nobake" in obj.name.lower():
                 continue
             
             if obj.type == 'MESH':
                 mesh_count += 1
+                
+                
                 display_name = obj.name
                 if display_name.startswith("C-"):
                     display_name = display_name.replace("C-", "", 1)
