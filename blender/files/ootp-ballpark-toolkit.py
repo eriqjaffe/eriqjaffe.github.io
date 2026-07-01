@@ -238,7 +238,7 @@ class OOTP_selected_scene_cleaner(bpy.types.Operator):
             print("Warning: No mesh objects were selected.")
         else:
             mesh_count = 0
-            for obj in context.scene.objects:
+            for obj in selected_meshes:
                 if "nobake" in obj.name.lower():
                     continue
                 
