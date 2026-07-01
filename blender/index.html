@@ -602,9 +602,11 @@
 
     <img width=250 src=".\images\image101.jpg">
 
-    <p>These are known in Blender circles as "fireflies."  In my experience it has to do with the strength of the emitters and the light bouncing off surfaces causing these hotspots.  You <i>can</i> lower the strength of the emitters, but that may produce bakes that appear too dark.  For our purposes I find the best way to minimize these is to go into the Render properties, expand Light Paths &rarr; Max Bounces and lower the "Total" and "Diffuse" values from their default values of 12 and 4.  I find that setting them to 4 and 1, respectively, resolves the issue.</p>
+    <p>This occurs because of the large emissive surfaces that are lighting the park.  The light rays are bouncing every which way and can cause this noise during a bake.  It's possible to minimize this by upping the Max Samples, which will slow down your bake time.  You can also lower the "Indirect Light" value underneath "Clamping."  By default it's set to 10.  I generally find that when I get this noise, that 3 is a pretty good spot.  You can find the sweet spot for your given model by starting low (although you generally don't want to set it below 1.5) and keep raising the value and re-baking a test component until you are satisfied.</p>
 
     <img src=".\images\image102.jpg">
+
+    <p>If absolutely necessary, you can also uncheck the "Indirect" contribution under Bake, which will shortcut the issue at the cost of a bit less realistic lighting.</p>
 
     <p class="question">Fixing Sketchup Issues after Importing into Blender</p>
     <p>If you have a component that is not what you want went in blender, you can delete the component from your blender file, and reimport the updated sketchup file. It will show up as a new Loose Entity (Loose Entity.001 usually). You can delete the top level new mesh (Loose Entity.001) and the sub-meshes will collapse into the original imported meshes. Find the new component you want to modify and follow the regular operations and then delete all of the new duplicated component usually identified with .001 suffix. (Deft)</p>
