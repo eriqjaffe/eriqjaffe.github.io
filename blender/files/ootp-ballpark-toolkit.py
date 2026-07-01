@@ -13,6 +13,7 @@ import os
 import re
 import sys
 import time
+import math
 from bpy_extras.io_utils import ExportHelper
 
 def ensure_system_console_open():
@@ -36,7 +37,7 @@ def ensure_system_console_open():
 
 
 # ====================================================================
-# OPERATOR 1: Global Scene Cleanup (Renamed Class & ID)
+# Global Scene Cleanup (Renamed Class & ID)
 # ====================================================================
 class OOTP_OT_scene_cleaner(bpy.types.Operator):
     """Purge DefaultMaterial geometry and isolate valid textures globally"""
@@ -48,13 +49,22 @@ class OOTP_OT_scene_cleaner(bpy.types.Operator):
         if bpy.ops.object.mode_set.poll():
             bpy.ops.object.mode_set(mode='OBJECT')
 
+        loose_obj_name = "_(Loose Entity)"
+
+        if loose_obj_name in bpy.data.objects:
+            loose_obj = bpy.data.objects[loose_obj_name]
+            
+            # Rename it to match your automated unwrap filter rules
+            loose_obj.name = "_(Loose Entity)_nobake"
         mesh_count = 0
-        for obj in context.scene.objects:
+        for obj in context.scene.objects:                
             if "nobake" in obj.name.lower():
                 continue
             
             if obj.type == 'MESH':
                 mesh_count += 1
+                
+                
                 display_name = obj.name
                 if display_name.startswith("C-"):
                     display_name = display_name.replace("C-", "", 1)
@@ -120,9 +130,8 @@ class OOTP_OT_scene_cleaner(bpy.types.Operator):
                     )
                     bake_image.generated_color = (0.0, 0.0, 0.0, 0.0)
                     
-                    # CRUCIAL FIX: Do NOT use pack() or fake filepaths on empty images.
-                    # Instead, tell Blender to NEVER clear this image from RAM, even if unlinked.
-                    bake_image.use_fake_user = True
+                    data_size = 1024 * 1024 * 4
+                    bake_image.pack(data=bytes(data_size), data_len=data_size)
                 else:
                     bake_image = bpy.data.images[clean_img_name]
 
@@ -175,11 +184,43 @@ class OOTP_OT_scene_cleaner(bpy.types.Operator):
                     tgt_tex_node.select = True
                     nodes.active = tgt_tex_node
 
+        world = bpy.context.scene.world
+        world.use_nodes = True
+        nodes = world.node_tree.nodes
+        links = world.node_tree.links
+        
+        # 2. Clear out any existing nodes to prevent overlapping wires
+        nodes.clear()
+        
+        # 3. Create the essential World nodes
+        world_output = nodes.new(type='ShaderNodeOutputWorld')
+        background = nodes.new(type='ShaderNodeBackground')
+        sky_texture = nodes.new(type='ShaderNodeTexSky')
+        
+        # Position them cleanly in the node graph (optional, but nice for readability)
+        sky_texture.location = (-300, 0)
+        background.location = (0, 0)
+        world_output.location = (200, 0)
+        
+        # 4. Configure your preferred Sky Model type
+        # 'NISHITA' is standard for realistic day/night sun elevations
+        sky_texture.sky_type = 'MULTIPLE_SCATTERING' 
+        
+        # Tweak these values to hit your daytime sweet spot
+        sky_texture.sun_elevation = math.radians(25)     # Angle above the horizon (higher = midday)
+        sky_texture.sun_rotation = math.radians(-190)        # Direction the shadows cast
+        sky_texture.sun_intensity = 0.2        # Power of the sun disk
+        background.inputs['Strength'].default_value = 0.2  # Overall ambient brightness
+        
+        # 5. Wire the nodes together
+        links.new(sky_texture.outputs['Color'], background.inputs['Color'])
+        links.new(background.outputs['Background'], world_output.inputs['Surface'])
+        
         self.report({'INFO'}, f"Processed {mesh_count} components. All UV maps, bakes, and target nodes configured!")
         return {'FINISHED'}
         
 # ====================================================================
-# OPERATOR 1a: Selected Object Cleanup
+# Selected Object Cleanup
 # ====================================================================
 class OOTP_selected_scene_cleaner(bpy.types.Operator):
     """Purge DefaultMaterial geometry and isolate valid textures for selected object(s)"""
@@ -197,7 +238,7 @@ class OOTP_selected_scene_cleaner(bpy.types.Operator):
             print("Warning: No mesh objects were selected.")
         else:
             mesh_count = 0
-            for obj in context.scene.objects:
+            for obj in selected_meshes:
                 if "nobake" in obj.name.lower():
                     continue
                 
@@ -268,9 +309,8 @@ class OOTP_selected_scene_cleaner(bpy.types.Operator):
                         )
                         bake_image.generated_color = (0.0, 0.0, 0.0, 0.0)
                         
-                        # CRUCIAL FIX: Do NOT use pack() or fake filepaths on empty images.
-                        # Instead, tell Blender to NEVER clear this image from RAM, even if unlinked.
-                        bake_image.use_fake_user = True
+                        data_size = 1024 * 1024 * 4
+                        bake_image.pack(data=bytes(data_size), data_len=data_size)
                     else:
                         bake_image = bpy.data.images[clean_img_name]
 
@@ -326,8 +366,139 @@ class OOTP_selected_scene_cleaner(bpy.types.Operator):
         self.report({'INFO'}, f"Processed {mesh_count} components. All UV maps, bakes, and target nodes configured!")
         return {'FINISHED'}
 
+
 # ====================================================================
-# OPERATOR 2: Node Cloner (Renamed Class & ID to bypass cache)
+# UV Unwrap entire model
+# ====================================================================
+class OOTP_UV_unwrap_global(bpy.types.Operator):
+    """Smart UV Unwrap every bakeable component in the model"""
+    bl_idname = "ootp.global_unwrap"
+    bl_label = "UV Unwrap Entire Model"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    def execute(self, context):
+        if bpy.ops.object.mode_set.poll():
+            bpy.ops.object.mode_set(mode='OBJECT')
+
+        target_objects = [obj for obj in context.scene.objects if "nobake" not in obj.name.lower() and obj.type == 'MESH']
+        
+        if not target_objects:
+            print("No 'nobake' mesh components found in the scene.")
+            return
+
+        print(f"Starting Smart UV Unwrap on {len(target_objects)} components...")
+
+        unwrapped_count = 0
+        
+        # Deselect everything first to maintain a clean state
+        bpy.ops.object.select_all(action='DESELECT')
+
+        for obj in target_objects:
+            # 1. Set the target object as the active, selected element
+            context.view_layer.objects.active = obj
+            obj.select_set(True)
+            
+            # 2. Switch to Edit Mode to access geometry operations
+            bpy.ops.object.mode_set(mode='EDIT')
+            
+            # 3. Select all geometry faces within the mesh
+            bpy.ops.mesh.select_all(action='SELECT')
+            
+            # 4. Run the Smart UV Project operator
+            # angle_limit=66: Great default for architectural/stadium geometry blocks
+            # island_margin=0.01: CRUCIAL padding to prevent baked lighting bleeding edge-to-edge
+            bpy.ops.uv.smart_project(
+                angle_limit=66.0, 
+                island_margin=0.02, 
+                area_weight=0.0, 
+                correct_aspect=True, 
+                scale_to_bounds=False
+            )
+            
+            bpy.ops.uv.pack_islands(
+                margin=0.02,
+                rotate=True,
+                rotate_method='AXIS_ALIGNED', 
+                shape_method='CONCAVE'
+            )
+            
+            # 5. Return safely to Object Mode and deselect
+            bpy.ops.object.mode_set(mode='OBJECT')
+            obj.select_set(False)
+            
+            unwrapped_count += 1
+            print(f"  -> Smart Unwrapped: {obj.name}")
+
+        self.report({'INFO'}, f"Finished! Successfully unwrap-prepped {unwrapped_count} components.")
+        return {'FINISHED'}
+        
+# ====================================================================
+# UV Unwrap selected objects
+# ====================================================================
+class OOTP_UV_unwrap_selected(bpy.types.Operator):
+    """Smart UV Unwrap every bakeable component in the model"""
+    bl_idname = "ootp.selected_unwrap"
+    bl_label = "UV Unwrap Selected Objects"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    def execute(self, context):
+        if bpy.ops.object.mode_set.poll():
+            bpy.ops.object.mode_set(mode='OBJECT')
+
+        target_objects = [obj for obj in context.selected_objects if "nobake" not in obj.name.lower() and obj.type == 'MESH']
+        
+        if not target_objects:
+            print("No 'nobake' mesh components found in the scene.")
+            return
+
+        unwrapped_count = 0
+        
+        print(f"Starting Smart UV Unwrap on {len(target_objects)} components...")
+
+        # Deselect everything first to maintain a clean state
+        bpy.ops.object.select_all(action='DESELECT')
+
+        for obj in target_objects:
+            # 1. Set the target object as the active, selected element
+            context.view_layer.objects.active = obj
+            obj.select_set(True)
+            
+            # 2. Switch to Edit Mode to access geometry operations
+            bpy.ops.object.mode_set(mode='EDIT')
+            
+            # 3. Select all geometry faces within the mesh
+            bpy.ops.mesh.select_all(action='SELECT')
+            
+            # 4. Run the Smart UV Project operator
+            # angle_limit=66: Great default for architectural/stadium geometry blocks
+            # island_margin=0.01: CRUCIAL padding to prevent baked lighting bleeding edge-to-edge
+            bpy.ops.uv.smart_project(
+                angle_limit=66.0, 
+                island_margin=0.02, 
+                area_weight=0.0, 
+                correct_aspect=True, 
+                scale_to_bounds=False
+            )
+            
+            bpy.ops.uv.pack_islands(
+                margin=0.02,
+                rotate=True,
+                rotate_method='AXIS_ALIGNED', 
+                shape_method='CONCAVE'
+            )
+            
+            # 5. Return safely to Object Mode and deselect
+            bpy.ops.object.mode_set(mode='OBJECT')
+            obj.select_set(False)
+            
+            print(f"  -> Smart Unwrapped: {obj.name}")
+            unwrapped_count += 1
+
+        self.report({'INFO'}, f"Finished! Successfully unwrap-prepped {unwrapped_count} component(s).")
+        return {'FINISHED'}
+
+# ====================================================================
+# Node Cloner (Renamed Class & ID to bypass cache)
 # ====================================================================
 class OOTP_OT_node_cloner(bpy.types.Operator):
     """Clone selected shader nodes to all other materials on the active component"""
@@ -381,7 +552,7 @@ class OOTP_OT_node_cloner(bpy.types.Operator):
         return {'FINISHED'}
 
 # ====================================================================
-# OPERATOR 3: Replace all materials with baked materials where applicable
+# Replace all materials with baked materials where applicable
 # ====================================================================
 class OOTP_replace_all_materials(bpy.types.Operator):
     """Replace all materials with baked materials, where applicable"""
@@ -426,7 +597,7 @@ class OOTP_replace_all_materials(bpy.types.Operator):
                 if active_uv:
                     node_uvmap.uv_map = active_uv.name
 
-                clean_img_name = f"{mat_name.replace(' ', '_')}_day.webp"
+                clean_img_name = f"{mat_name.replace(' ', '_')}_day.png"
                 
                 if bpy.data.is_saved:
                     blend_dir = os.path.dirname(bpy.data.filepath)
@@ -458,7 +629,7 @@ class OOTP_replace_all_materials(bpy.types.Operator):
         return {'FINISHED'}
         
 # ====================================================================
-# OPERATOR 4: OOTP OBJ export with crowd replacements
+# OOTP OBJ export with crowd replacements
 # ====================================================================        
 class WM_OT_ootp_ballpark_exporter(bpy.types.Operator, ExportHelper):
     """Export OBJ for OOTP and automatically swap out crowd material blocks in the MTL file"""
@@ -613,7 +784,7 @@ class WM_OT_ootp_ballpark_exporter(bpy.types.Operator, ExportHelper):
         return {'FINISHED'}
 
 # ====================================================================
-# OPERATOR 5: Bake all components that aren't tagged "nobake"
+# Bake all components that aren't tagged "nobake"
 # ==================================================================== 
 class OOTP_OT_batch_bake_day(bpy.types.Operator):
     """Bakes all valid and prepared components and saves them as either _day or _night bakes."""
@@ -718,12 +889,11 @@ class OOTP_OT_batch_bake_day(bpy.types.Operator):
                 bpy.ops.object.bake(type='DIFFUSE', save_mode='INTERNAL')
                 
                 # 4. Save and rename the resulting image map asset
-                new_filename = target_image.name.replace("_bake", suffix) + ".webp"
+                new_filename = target_image.name.replace("_bake", suffix) + ".png"
                 save_path = os.path.join(model_dir, new_filename)
                 
                 target_image.filepath_raw = save_path
-                target_image.file_format = 'WEBP'
-                bpy.context.scene.render.image_settings.compression = 100
+                target_image.file_format = 'PNG'
                 target_image.save()
                 
                 print(f"  -> Successfully saved: {save_path}")
@@ -753,6 +923,9 @@ class VIEW3D_MT_ootp_custom_menu(bpy.types.Menu):
         layout.operator("ootp.object_cleaner", text="Prepare Selected Objects", icon='FILE_REFRESH')
         layout.operator("ootp.node_cloner", text="Clone Nodes to Component Materials", icon='DUPLICATE')
         layout.separator()
+        layout.operator("ootp.global_unwrap", text="Unwrap Entire Model", icon='STICKY_UVS_LOC')
+        layout.operator("ootp.selected_unwrap", text="Unwrap Selected Objects", icon='STICKY_UVS_LOC')
+        layout.separator()
         layout.operator("ootp.batch_bake", text="Bake All Bakeable Components", icon='RENDER_STILL')
         layout.separator()
         layout.operator("ootp.replace_all_materials", text="Replace all materials with baked textures", icon='MATERIAL')
@@ -769,6 +942,8 @@ def register():
     bpy.utils.register_class(OOTP_OT_scene_cleaner)
     bpy.utils.register_class(OOTP_selected_scene_cleaner)
     bpy.utils.register_class(OOTP_OT_node_cloner)
+    bpy.utils.register_class(OOTP_UV_unwrap_global)
+    bpy.utils.register_class(OOTP_UV_unwrap_selected)
     bpy.utils.register_class(OOTP_replace_all_materials)
     bpy.utils.register_class(WM_OT_ootp_ballpark_exporter)
     bpy.utils.register_class(OOTP_OT_batch_bake_day)
@@ -781,6 +956,8 @@ def unregister():
     bpy.utils.unregister_class(OOTP_OT_batch_bake_day)
     bpy.utils.unregister_class(WM_OT_ootp_ballpark_exporter)
     bpy.utils.unregister_class(OOTP_replace_all_materials)
+    bpy.utils.unregister_class(OOTP_UV_unwrap_global)
+    bpy.utils.unregister_class(OOTP_UV_unwrap_selected)
     bpy.utils.unregister_class(OOTP_OT_node_cloner)
     bpy.utils.unregister_class(OOTP_selected_scene_cleaner)
     bpy.utils.unregister_class(OOTP_OT_scene_cleaner)
