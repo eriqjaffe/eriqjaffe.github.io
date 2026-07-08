@@ -80,7 +80,7 @@ def set_default_sky_texture(world):
     node_sky = nodes.new(type='ShaderNodeTexSky')
     node_sky.location = (0, 0)
     
-    sky_data = USER_SETTINGS.get("sky_texture_defaults", {})
+    sky_data = ("sky_texture_defaults", {})
 
     node_sky.sky_type = sky_data.get('sky_type') 
     node_sky.sun_intensity = sky_data.get('sun_intensity')
@@ -271,7 +271,7 @@ class OOTP_OT_scene_cleaner(bpy.types.Operator):
         background.location = (0, 0)
         world_output.location = (200, 0)
         
-        sky_data = USER_SETTINGS.get("sky_texture_defaults", {})
+        sky_data = ("sky_texture_defaults", {})
         
         sky_texture.sky_type = sky_data.get('sky_type') 
         
@@ -1133,7 +1133,7 @@ class OOTP_day_night_toggle(bpy.types.Operator):
             set_default_sky_texture(world)
             return
         
-        sky_data = USER_SETTINGS.get("sky_texture_defaults", {})
+        sky_data = ("sky_texture_defaults", {})
         
         if node_sky.sun_intensity > 0.05:
             node_sky.sun_intensity = 0.000             
@@ -1152,7 +1152,7 @@ class OOTP_day_night_toggle(bpy.types.Operator):
             
         material_brightness_map = {}
         
-        emission_data = USER_SETTINGS.get("material_emission_defaults")
+        emission_data = USER_SETTINGS.get("material_emission_defaults", {})
         print(emission_data)
         
         for mat in bpy.data.materials:
