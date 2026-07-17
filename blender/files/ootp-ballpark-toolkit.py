@@ -1,7 +1,7 @@
 bl_info = {
     "name": "OOTP Ballpark Toolkit",
     "author": "Eriq Jaffe",
-    "version": (0, 6),
+    "version": (0, 6, 1),
     "blender": (4, 0, 0),
     "location": "3D Viewport > Main Top Bar (Next to Object Menu)",
     "description": "Custom workflow utilities for Out of the Park Baseball stadium creation.",
@@ -80,7 +80,7 @@ def set_default_sky_texture(world):
     node_sky = nodes.new(type='ShaderNodeTexSky')
     node_sky.location = (0, 0)
     
-    sky_data = ("sky_texture_defaults", {})
+    sky_data = USER_SETTINGS.get("sky_texture_defaults", {})
 
     node_sky.sky_type = sky_data.get('sky_type') 
     node_sky.sun_intensity = sky_data.get('sun_intensity')
@@ -271,7 +271,7 @@ class OOTP_OT_scene_cleaner(bpy.types.Operator):
         background.location = (0, 0)
         world_output.location = (200, 0)
         
-        sky_data = ("sky_texture_defaults", {})
+        sky_data = USER_SETTINGS.get("sky_texture_defaults", {})
         
         sky_texture.sky_type = sky_data.get('sky_type') 
         
@@ -619,6 +619,8 @@ class OOTP_replace_all_materials(bpy.types.Operator):
         
         mesh_objects = [obj for obj in context.scene.objects if "nobake" not in obj.name.lower() and obj.type == 'MESH']
         mesh_objects = sorted(mesh_objects, key=lambda obj: obj.name.lower())
+        
+        replaced_count = 0
     
         for obj in mesh_objects:
             if "nobake" in obj.name.lower():
@@ -654,19 +656,27 @@ class OOTP_replace_all_materials(bpy.types.Operator):
                 clean_img_name = f"{mat_name.replace(' ', '_')}_day.png"
                 
                 if bpy.data.is_saved:
-                    blend_dir = os.path.dirname(bpy.data.filepath)
+                    absolute_blend_path = bpy.path.abspath(bpy.data.filepath)
+                    blend_dir = os.path.dirname(absolute_blend_path)
                     full_image_path = os.path.join(blend_dir, clean_img_name)
                     
                     if os.path.exists(full_image_path):
                         try:
-                            baked_texture = bpy.data.images.load(full_image_path, check_existing=True)
+                            if clean_img_name in bpy.data.images:
+                                baked_texture = bpy.data.images[clean_img_name]
+                                
+                                if baked_texture.packed_file:
+                                    baked_texture.unpack(method='USE_LOCAL')
+                                baked_texture.filepath = full_image_path
+                            else:
+                                baked_texture = bpy.data.images.load(full_image_path)
                             node_texture.image = baked_texture
                             baked_texture.reload()
                             print(f"Successfully auto-loaded: {clean_img_name}")
+                            replaced_count += 1
                         except Exception as e:
                             print(f"Error loading image {clean_img_name}: {e}")
-                    else:
-                        print(f"Skipped loading: {clean_img_name} not found in blend folder.")
+
                 else:
                     print("Could not auto-load texture: Blend file must be saved to determine folder path.")
                 
@@ -677,8 +687,93 @@ class OOTP_replace_all_materials(bpy.types.Operator):
 
                 obj.data.materials.append(new_mat)
         
-        self.report({'INFO'}, f"I think I replaced as many textres as I could find...")
+        self.report({'INFO'}, f"Replaced materials in {replaced_count} objects...")
         return {'FINISHED'}
+        
+# ====================================================================
+# Replace selected materials with baked materials where applicable
+# ====================================================================
+class OOTP_replace_selected_materials(bpy.types.Operator):
+    """Replace selected materials with baked materials, where applicable"""
+    bl_idname = "ootp.replace_selected_materials"
+    bl_label = "Replace selected materials with baked textures"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    def execute(self, context):
+        
+        mesh_objects = [obj for obj in context.selected_objects if "nobake" not in obj.name.lower() and obj.type == 'MESH']
+        mesh_objects = sorted(mesh_objects, key=lambda obj: obj.name.lower())
+        
+        replaced_count = 0
+    
+        for obj in mesh_objects:
+            if "nobake" in obj.name.lower():
+                continue
+            
+            if obj.type == 'MESH':
+                obj_name = obj.name
+                mat_name = obj_name[2:] if obj_name.startswith("C-") else obj_name
+                
+                obj.data.materials.clear()
+        
+                new_mat = bpy.data.materials.new(name=mat_name)
+                new_mat.use_nodes = True
+                nodes = new_mat.node_tree.nodes
+                links = new_mat.node_tree.links
+                
+                nodes.clear()
+
+                node_output  = nodes.new(type='ShaderNodeOutputMaterial')
+                node_principled = nodes.new(type='ShaderNodeBsdfPrincipled')
+                node_texture = nodes.new(type='ShaderNodeTexImage')
+                node_uvmap   = nodes.new(type='ShaderNodeUVMap')
+                
+                node_uvmap.location = (-600, 0)
+                node_texture.location = (-300, 0)
+                node_principled.location = (0, 0)
+                node_output.location = (300, 0)
+                
+                active_uv = obj.data.uv_layers.active
+                if active_uv:
+                    node_uvmap.uv_map = active_uv.name
+
+                clean_img_name = f"{mat_name.replace(' ', '_')}_day.png"
+                
+                if bpy.data.is_saved:
+                    absolute_blend_path = bpy.path.abspath(bpy.data.filepath)
+                    blend_dir = os.path.dirname(absolute_blend_path)
+                    full_image_path = os.path.join(blend_dir, clean_img_name)
+                    
+                    if os.path.exists(full_image_path):
+                        try:
+                            if clean_img_name in bpy.data.images:
+                                baked_texture = bpy.data.images[clean_img_name]
+                                
+                                if baked_texture.packed_file:
+                                    baked_texture.unpack(method='USE_LOCAL')
+                                baked_texture.filepath = full_image_path
+                            else:
+                                baked_texture = bpy.data.images.load(full_image_path)
+                            node_texture.image = baked_texture
+                            baked_texture.reload()
+                            print(f"Successfully auto-loaded: {clean_img_name}")
+                            replaced_count += 1
+                        except Exception as e:
+                            print(f"Error loading image {clean_img_name}: {e}")
+
+                else:
+                    print("Could not auto-load texture: Blend file must be saved to determine folder path.")
+                
+                links.new(node_uvmap.outputs['UV'], node_texture.inputs['Vector'])
+                links.new(node_texture.outputs['Color'], node_principled.inputs['Base Color'])
+                links.new(node_texture.outputs['Alpha'], node_principled.inputs['Alpha'])
+                links.new(node_principled.outputs['BSDF'], node_output.inputs['Surface'])
+
+                obj.data.materials.append(new_mat)
+        
+        self.report({'INFO'}, f"Replaced materials in {replaced_count} objects...")
+        return {'FINISHED'}
+        
         
 # ====================================================================
 # OOTP OBJ export with crowd replacements
@@ -1133,7 +1228,7 @@ class OOTP_day_night_toggle(bpy.types.Operator):
             set_default_sky_texture(world)
             return
         
-        sky_data = ("sky_texture_defaults", {})
+        sky_data = USER_SETTINGS.get("sky_texture_defaults", {})
         
         if node_sky.sun_intensity > 0.05:
             node_sky.sun_intensity = 0.000             
@@ -1153,7 +1248,6 @@ class OOTP_day_night_toggle(bpy.types.Operator):
         material_brightness_map = {}
         
         emission_data = USER_SETTINGS.get("material_emission_defaults", {})
-        print(emission_data)
         
         for mat in bpy.data.materials:
             if not mat.node_tree:
@@ -1200,6 +1294,7 @@ class VIEW3D_MT_ootp_custom_menu(bpy.types.Menu):
         layout.operator("ootp.selected_batch_bake", text="Bake Selected Components", icon='RENDER_STILL')
         layout.separator()
         layout.operator("ootp.replace_all_materials", text="Replace all materials with baked textures", icon='MATERIAL')
+        layout.operator("ootp.replace_selected_materials", text="Replace selected materials with baked textures", icon='MATERIAL')
         layout.operator("ootp.day_night_toggle", text="Toggle between Day & Night Lighting", icon='LIGHT_SUN')
         layout.separator()
         layout.operator("wm.export_ootp_ballpark", text="Export Ballpark to OOTP", icon='EXPORT')
@@ -1222,6 +1317,7 @@ def register():
     bpy.utils.register_class(OOTP_UV_unwrap_global)
     bpy.utils.register_class(OOTP_UV_unwrap_selected)
     bpy.utils.register_class(OOTP_replace_all_materials)
+    bpy.utils.register_class(OOTP_replace_selected_materials)
     bpy.utils.register_class(WM_OT_ootp_ballpark_exporter)
     bpy.utils.register_class(OOTP_OT_batch_bake_day)
     bpy.utils.register_class(OOTP_OT_selected_batch_bake_day)
@@ -1238,6 +1334,7 @@ def unregister():
     bpy.utils.unregister_class(OOTP_OT_selected_batch_bake_day)
     bpy.utils.unregister_class(WM_OT_ootp_ballpark_exporter)
     bpy.utils.unregister_class(OOTP_replace_all_materials)
+    bpy.utils.unregister_class(OOTP_replace_selected_materials)
     bpy.utils.unregister_class(OOTP_UV_unwrap_global)
     bpy.utils.unregister_class(OOTP_UV_unwrap_selected)
     bpy.utils.unregister_class(OOTP_OT_node_cloner)
