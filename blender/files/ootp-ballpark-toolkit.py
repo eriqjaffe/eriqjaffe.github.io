@@ -1,7 +1,7 @@
 bl_info = {
     "name": "OOTP Ballpark Toolkit",
     "author": "Eriq Jaffe",
-    "version": (0, 6, 1),
+    "version": (0, 7, 0),
     "blender": (4, 0, 0),
     "location": "3D Viewport > Main Top Bar (Next to Object Menu)",
     "description": "Custom workflow utilities for Out of the Park Baseball stadium creation.",
@@ -1203,74 +1203,115 @@ class OOTP_reload_config(bpy.types.Operator):
         # Push a visual notification toast to the bottom right of Blender's UI
         self.report({'INFO'}, "Add-on settings reloaded successfully!")
         return {'FINISHED'}
-        
-# ====================================================================
-# Reload preferences
-# ==================================================================== 
 
+def get_matching_value(name, data_dict, default=0.0):
+    """
+    Checks for exact match (for saved state), 
+    then checks if name starts with any key (for JSON defaults).
+    """
+    # 1. Exact match (for your saved night_emitter_map)
+    if name in data_dict:
+        return data_dict[name]
+    
+    # 2. "Starts with" match (for your JSON configuration)
+    # Sorting by length (longest first) ensures 'floodlight_tower' 
+    # is checked before 'floodlight'
+    sorted_keys = sorted(data_dict.keys(), key=len, reverse=True)
+    
+    for key in sorted_keys:
+        if name.startswith(key):
+            return data_dict[key]
+            
+    return default
+    
 class OOTP_day_night_toggle(bpy.types.Operator):
-    """Toggle Between Day and Night Lighting"""
     bl_idname = "ootp.day_night_toggle"
     bl_label = "Switch Between Day and Night Lighting"
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        world = bpy.context.scene.world
-        if not world or not world.node_tree:
-            print("No active world node tree found.")
-            return
+        world = context.scene.world
+        scene = context.scene
+        if not world or not world.node_tree: return {'CANCELLED'}
         
         nodes = world.node_tree.nodes
         node_sky = next((n for n in nodes if n.type == 'TEX_SKY'), None)
-        node_background = next((n for n in nodes if n.type == 'BACKGROUND'), None)
+        node_bg = next((n for n in nodes if n.type == 'BACKGROUND'), None)
         
-        if not node_sky or not node_background:
-            set_default_sky_texture(world)
-            return
+        sky_defaults = USER_SETTINGS.get("sky_texture_defaults", {})
+        emission_defaults = USER_SETTINGS.get("material_emission_defaults", {})
         
-        sky_data = USER_SETTINGS.get("sky_texture_defaults", {})
-        
-        if node_sky.sun_intensity > 0.05:
-            node_sky.sun_intensity = 0.000             
-            node_sky.sun_elevation = math.radians(0)  
-            node_sky.sun_rotation = math.radians(90)
-            node_background.inputs['Strength'].default_value = 0.100 
-            night = True
-            print("Sky set to night.")
-        else:
-            node_sky.sun_intensity = sky_data.get('sun_intensity')
-            node_sky.sun_elevation = math.radians(sky_data.get('sun_elevation'))   
-            node_sky.sun_rotation = math.radians(sky_data.get('sun_rotation'))  
-            node_background.inputs['Strength'].default_value = sky_data.get('strength')
-            night = False
-            print("Sky set to day.")
-            
-        material_brightness_map = {}
-        
-        emission_data = USER_SETTINGS.get("material_emission_defaults", {})
-        
-        for mat in bpy.data.materials:
-            if not mat.node_tree:
-                continue
-                
-            matched_keyword = None
-            for keyword in emission_data.keys():
-                if keyword in mat.name:
-                    matched_keyword = keyword
-                    break
+        is_night = node_sky.sun_intensity < 0.05
 
-            if matched_keyword:
-                emission_strength = emission_data[matched_keyword] if night else 0.0
+        if not is_night:
+            # --- GOING TO NIGHT ---
+            # 1. Save Day Sky Settings
+            scene["day_settings"] = {
+                "sun_intensity": node_sky.sun_intensity,
+                "sun_elevation": node_sky.sun_elevation,
+                "sun_rotation": node_sky.sun_rotation,
+                "strength": node_bg.inputs['Strength'].default_value
+            }
+            
+            # 2. Apply Night Lighting
+            node_sky.sun_intensity = 0.0
+            node_sky.sun_elevation = math.radians(0)
+            node_sky.sun_rotation = math.radians(90)
+            node_bg.inputs['Strength'].default_value = 0.1
+            
+            # 3. Restore Night Emitters (Use stored map, or fallback to JSON defaults)
+            raw_data = scene.get("night_emitter_map", "{}")
+
+            # 2. Convert the string back into a real Python dictionary
+            try:
+                stored_emitters = json.loads(raw_data)
+            except (json.JSONDecodeError, TypeError):
+                stored_emitters = {}
+
+            # Check if currently Day
+            is_night = node_sky.sun_intensity < 0.05
+            for mat in bpy.data.materials:
+                if not mat.node_tree: continue
                 
-                mat_nodes = mat.node_tree.nodes
-                principled = next((n for n in mat_nodes if n.type == 'BSDF_PRINCIPLED'), None)
-                
-                if principled:
-                    if 'Emission Strength' in principled.inputs:
-                        principled.inputs['Emission Strength'].default_value = emission_strength
-                    print(f"{mat.name} strength set to {emission_strength}")
-                    continue
+                principled = next((n for n in mat.node_tree.nodes if n.type == 'BSDF_PRINCIPLED'), None)
+                if principled and 'Emission Strength' in principled.inputs:
                     
+                    # 1. Try to find the value in the saved map (partial match supported)
+                    val = get_matching_value(mat.name, stored_emitters, default=None)
+                    
+                    # 2. If not in the map, fallback to the JSON defaults (partial match supported)
+                    if val is None:
+                        val = get_matching_value(mat.name, emission_defaults, default=0.0)
+                        
+                    principled.inputs['Emission Strength'].default_value = val
+            print("Switched to Night. Emitters restored from memory/defaults.")
+
+        else:
+            # --- GOING TO DAY ---
+            # 1. Save Current Night Emitter states before turning them off
+            emitter_map = {}
+            for mat in bpy.data.materials:
+                if mat.node_tree:
+                    p = next((n for n in mat.node_tree.nodes if n.type == 'BSDF_PRINCIPLED'), None)
+                    if p and 'Emission Strength' in p.inputs:
+                        emitter_map[mat.name] = p.inputs['Emission Strength'].default_value
+            scene["night_emitter_map"] = json.dumps(emitter_map) # Persists to .blend file
+            
+            # 2. Restore Day Sky
+            day = scene.get("day_settings", sky_defaults)
+            node_sky.sun_intensity = day.get('sun_intensity', sky_defaults.get('sun_intensity'))
+            node_sky.sun_elevation = day.get('sun_elevation', math.radians(sky_defaults.get('sun_elevation')))
+            node_sky.sun_rotation = day.get('sun_rotation', math.radians(sky_defaults.get('sun_rotation')))
+            node_bg.inputs['Strength'].default_value = day.get('strength', sky_defaults.get('strength'))
+            
+            # 3. Turn off Emitters
+            for mat in bpy.data.materials:
+                if mat.node_tree:
+                    p = next((n for n in mat.node_tree.nodes if n.type == 'BSDF_PRINCIPLED'), None)
+                    if p and 'Emission Strength' in p.inputs:
+                        p.inputs['Emission Strength'].default_value = 0.0
+            print("Switched to Day. Emitter states cached.")
+
         return {'FINISHED'}
    
 # ====================================================================
