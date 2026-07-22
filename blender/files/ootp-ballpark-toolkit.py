@@ -283,6 +283,28 @@ class OOTP_OT_scene_cleaner(bpy.types.Operator):
         links.new(sky_texture.outputs['Color'], background.inputs['Color'])
         links.new(background.outputs['Background'], world_output.inputs['Surface'])
         
+        # add a camera for possible rendering later?
+        
+        cam_data = bpy.data.cameras.new(name="OOTP_Broadcast_Cam")
+        cam_data.lens = 23 # Wide angle mm
+        
+        cam_obj = bpy.data.objects.new("OOTP_Broadcast_Cam", cam_data)
+        bpy.context.scene.collection.objects.link(cam_obj)
+        bpy.context.scene.camera = cam_obj # Set as active render camera
+        
+        # 2. Position Camera behind Home Plate on the diagonal
+        cam_obj.location = (-17.0, -17.0, 40.0)
+        
+        # 3. Add Track To Constraint pointing towards 2nd base
+        target = bpy.data.objects.new("Cam_Target", None)
+        bpy.context.scene.collection.objects.link(target)
+        target.location = (20.0, 20.0, 1.0) # Pitcher / 2nd Base area
+        
+        constraint = cam_obj.constraints.new(type='TRACK_TO')
+        constraint.target = target
+        constraint.track_axis = 'TRACK_NEGATIVE_Z'
+        constraint.up_axis = 'UP_Y'
+        
         self.report({'INFO'}, f"Processed {mesh_count} components. All UV maps, bakes, and target nodes configured!")
         return {'FINISHED'}
         
@@ -1482,6 +1504,12 @@ class OOTP_day_night_toggle(bpy.types.Operator):
                         val = get_matching_value(mat.name, emission_defaults, default=0.0)
                         
                     principled.inputs['Emission Strength'].default_value = val
+                    
+            for obj in bpy.data.objects:
+                if obj.type == 'LIGHT' and obj.data.type == 'AREA':
+                    obj.hide_set(False)
+                    obj.hide_render = False
+                            
             print("Switched to Night. Emitters restored from memory/defaults.")
 
         else:
@@ -1509,6 +1537,11 @@ class OOTP_day_night_toggle(bpy.types.Operator):
                     if p and 'Emission Strength' in p.inputs:
                         p.inputs['Emission Strength'].default_value = 0.0
             print("Switched to Day. Emitter states cached.")
+            
+            for obj in bpy.data.objects:
+                if obj.type == 'LIGHT' and obj.data.type == 'AREA':
+                    obj.hide_set(True)
+                    obj.hide_render = True
 
         return {'FINISHED'}
    
