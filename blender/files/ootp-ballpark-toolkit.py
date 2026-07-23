@@ -1,7 +1,7 @@
 bl_info = {
     "name": "OOTP Ballpark Toolkit",
     "author": "Eriq Jaffe",
-    "version": (0, 7, 2),
+    "version": (0, 7, 3),
     "blender": (4, 0, 0),
     "location": "3D Viewport > Main Top Bar (Next to Object Menu)",
     "description": "Custom workflow utilities for Out of the Park Baseball stadium creation.",
@@ -16,6 +16,8 @@ import time
 import math
 import json
 from bpy_extras.io_utils import ExportHelper
+
+addon_keymaps = []
 
 CONFIG_DIR = bpy.utils.user_resource('CONFIG', path="ootp-ballpark-toolkit", create=True)
 CONFIG_FILE_PATH = os.path.join(CONFIG_DIR, "defaults.json")
@@ -1602,8 +1604,31 @@ def register():
     bpy.utils.register_class(OOTP_day_night_toggle)
     bpy.utils.register_class(VIEW3D_MT_ootp_custom_menu)
     bpy.types.VIEW3D_MT_editor_menus.append(draw_menu_header)
+    
+    wm = bpy.context.window_manager
+    kc = wm.keyconfigs.addon
+    if kc:
+        # Target 3D Viewport in Object Mode
+        km = kc.keymaps.new(name='3D View', space_type='VIEW_3D')
+        
+        # Call the built-in 'wm.call_menu' operator
+        kmi = km.keymap_items.new(
+            "wm.call_menu", 
+            type='O',
+            value='PRESS', 
+            shift=False,
+            ctrl=False, 
+            alt=True
+        )
+        # Set the target menu name to your OOTP menu's bl_idname
+        kmi.properties.name = "VIEW3D_MT_ootp_custom_menu"
+        
+        addon_keymaps.append((km, kmi))
 
 def unregister():
+    for km, kmi in addon_keymaps:
+        km.keymap_items.remove(kmi)
+    addon_keymaps.clear()
     bpy.types.VIEW3D_MT_editor_menus.remove(draw_menu_header)
     bpy.utils.unregister_class(VIEW3D_MT_ootp_custom_menu)
     bpy.utils.unregister_class(OOTP_OT_batch_bake_day)
