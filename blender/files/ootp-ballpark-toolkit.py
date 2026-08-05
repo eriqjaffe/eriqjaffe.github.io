@@ -1,7 +1,7 @@
 bl_info = {
     "name": "OOTP Ballpark Toolkit",
     "author": "Eriq Jaffe",
-    "version": (0, 7, 3),
+    "version": (0, 7, 4),
     "blender": (4, 0, 0),
     "location": "3D Viewport > Main Top Bar (Next to Object Menu)",
     "description": "Custom workflow utilities for Out of the Park Baseball stadium creation.",
@@ -1384,6 +1384,196 @@ class OOTP_OT_selected_batch_bake_day(bpy.types.Operator):
         
         self.report({'INFO'}, f"Successfully baked and saved {baked_count} texture maps in {time_string}")
         return {'FINISHED'}
+        
+# ====================================================================
+# Shadow-only selected components that aren't tagged "nobake"
+# ==================================================================== 
+class OOTP_OT_selected_batch_shadow_bake_day(bpy.types.Operator):
+    """Bakes all valid and selected components and saves them as either _day or _night bakes."""
+    bl_idname = "ootp.selected_shadow_batch_bake"
+    bl_label = "OOTP Selected Shadow Batch Bake"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        
+        start_time = time.time()
+        
+        context.scene.render.engine = 'CYCLES'
+        context.scene.cycles.samples = 256
+        context.scene.render.bake.use_pass_direct = True
+        context.scene.render.bake.use_pass_indirect = True
+        context.scene.render.bake.use_pass_color = False
+        
+        suffix = "_shadow"
+        
+        ensure_system_console_open()
+        
+        if not bpy.data.is_saved:
+            self.report({'ERROR'}, "Please save your Blend file first so the script knows where to drop the textures!")
+            return {'CANCELLED'}
+            
+        model_dir = os.path.dirname(bpy.data.filepath)
+        
+        if bpy.ops.object.mode_set.poll():
+            bpy.ops.object.mode_set(mode='OBJECT')
+            
+        baked_count = 0
+        
+        mesh_objects = [
+            obj for obj in context.selected_objects 
+            if obj.type == 'MESH' 
+            and "nobake" not in obj.name.lower() 
+            and not obj.hide_viewport 
+            and not obj.hide_render
+        ]
+        
+        mesh_objects = sorted(mesh_objects, key=lambda obj: obj.name.lower())
+        
+        for idx, obj in enumerate(mesh_objects, start=1):
+            
+            if "nobake" in obj.name.lower() or obj.hide_viewport or obj.hide_render:
+                print(f"({idx}/{len(mesh_objects)}) Skipping {obj.name}: Object is excluded, hidden or disabled for baking.")
+                continue
+                
+            if obj.type == 'MESH':
+                bpy.ops.object.select_all(action='DESELECT')
+                obj.select_set(True)
+                context.view_layer.objects.active = obj
+                
+                target_image = None
+                for slot in obj.material_slots:
+                    if slot.material and slot.material.use_nodes:
+                        for node in slot.material.node_tree.nodes:
+                            if node.type == 'TEXT_IMAGE' or (node.type == 'TEX_IMAGE' and node.label == "Bake Target"):
+                                if node.image:
+                                    target_image = node.image
+                                    node.select = True
+                                    slot.material.node_tree.nodes.active = node
+                
+                if not target_image:
+                    print(f"({idx}/{len(mesh_objects)}) Skipping {obj.name}: No active 'Bake Target' image node found.")
+                    continue
+                    
+                print(f"({idx}/{len(mesh_objects)}) Baking {obj.name} at 256 samples...")
+                
+                bpy.ops.object.bake(type='DIFFUSE', save_mode='INTERNAL')
+                
+                base_name, _ = os.path.splitext(target_image.name)
+                modified_base = base_name.replace("_day", suffix)
+                new_filename = f"{modified_base}.png"
+                save_path = os.path.join(model_dir, new_filename)
+                
+                target_image.filepath_raw = save_path
+                target_image.file_format = 'PNG'
+                target_image.save()
+                
+                print(f"  -> Successfully saved: {save_path}")
+                baked_count += 1
+         
+        
+        elapsed_seconds = time.time() - start_time
+        minutes = int(elapsed_seconds // 60)
+        seconds = int(elapsed_seconds % 60)
+        
+        time_string = f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s"
+        
+        self.report({'INFO'}, f"Successfully baked and saved {baked_count} texture maps in {time_string}")
+        return {'FINISHED'}
+        
+# ====================================================================
+# Color-only selected components that aren't tagged "nobake"
+# ==================================================================== 
+class OOTP_OT_selected_batch_color_bake_day(bpy.types.Operator):
+    """Bakes all valid and selected components and saves them as either _day or _night bakes."""
+    bl_idname = "ootp.selected_color_batch_bake"
+    bl_label = "OOTP Selected Color Batch Bake"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        
+        start_time = time.time()
+        
+        context.scene.render.engine = 'CYCLES'
+        context.scene.cycles.samples = 1
+        context.scene.render.bake.use_pass_direct = False
+        context.scene.render.bake.use_pass_indirect = False
+        context.scene.render.bake.use_pass_color = True
+        
+        suffix = "_color"
+        
+        ensure_system_console_open()
+        
+        if not bpy.data.is_saved:
+            self.report({'ERROR'}, "Please save your Blend file first so the script knows where to drop the textures!")
+            return {'CANCELLED'}
+            
+        model_dir = os.path.dirname(bpy.data.filepath)
+        
+        if bpy.ops.object.mode_set.poll():
+            bpy.ops.object.mode_set(mode='OBJECT')
+            
+        baked_count = 0
+        
+        mesh_objects = [
+            obj for obj in context.selected_objects 
+            if obj.type == 'MESH' 
+            and "nobake" not in obj.name.lower() 
+            and not obj.hide_viewport 
+            and not obj.hide_render
+        ]
+        
+        mesh_objects = sorted(mesh_objects, key=lambda obj: obj.name.lower())
+        
+        for idx, obj in enumerate(mesh_objects, start=1):
+            
+            if "nobake" in obj.name.lower() or obj.hide_viewport or obj.hide_render:
+                print(f"({idx}/{len(mesh_objects)}) Skipping {obj.name}: Object is excluded, hidden or disabled for baking.")
+                continue
+                
+            if obj.type == 'MESH':
+                bpy.ops.object.select_all(action='DESELECT')
+                obj.select_set(True)
+                context.view_layer.objects.active = obj
+                
+                target_image = None
+                for slot in obj.material_slots:
+                    if slot.material and slot.material.use_nodes:
+                        for node in slot.material.node_tree.nodes:
+                            if node.type == 'TEXT_IMAGE' or (node.type == 'TEX_IMAGE' and node.label == "Bake Target"):
+                                if node.image:
+                                    target_image = node.image
+                                    node.select = True
+                                    slot.material.node_tree.nodes.active = node
+                
+                if not target_image:
+                    print(f"({idx}/{len(mesh_objects)}) Skipping {obj.name}: No active 'Bake Target' image node found.")
+                    continue
+                    
+                print(f"({idx}/{len(mesh_objects)}) Baking {obj.name} at 1 sample...")
+                
+                bpy.ops.object.bake(type='DIFFUSE', save_mode='INTERNAL')
+                
+                base_name, _ = os.path.splitext(target_image.name)
+                modified_base = base_name.replace("_day", suffix)
+                new_filename = f"{modified_base}.png"
+                save_path = os.path.join(model_dir, new_filename)
+                
+                target_image.filepath_raw = save_path
+                target_image.file_format = 'PNG'
+                target_image.save()
+                
+                print(f"  -> Successfully saved: {save_path}")
+                baked_count += 1
+         
+        
+        elapsed_seconds = time.time() - start_time
+        minutes = int(elapsed_seconds // 60)
+        seconds = int(elapsed_seconds % 60)
+        
+        time_string = f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s"
+        
+        self.report({'INFO'}, f"Successfully baked and saved {baked_count} texture maps in {time_string}")
+        return {'FINISHED'}        
   
 # ====================================================================
 # Open config json file for editing
@@ -1569,6 +1759,9 @@ class VIEW3D_MT_ootp_custom_menu(bpy.types.Menu):
         layout.operator("ootp.test_batch_bake", text="Test Bake & Replace All Bakeable Components", icon='RENDER_STILL')
         layout.operator("ootp.test_selected_bake", text="Test Bake & Replace Selected Components", icon='RENDER_STILL')
         layout.separator()
+        layout.operator("ootp.selected_shadow_batch_bake", text="Bake Selected Component Shadows", icon='RENDER_STILL')
+        layout.operator("ootp.selected_color_batch_bake", text="Bake Selected Component Colors", icon='RENDER_STILL')
+        layout.separator()
         layout.operator("ootp.replace_all_materials", text="Replace all materials with baked textures", icon='MATERIAL')
         layout.operator("ootp.replace_selected_materials", text="Replace selected materials with baked textures", icon='MATERIAL')
         layout.operator("ootp.day_night_toggle", text="Toggle between Day & Night Lighting", icon='LIGHT_SUN')
@@ -1599,6 +1792,8 @@ def register():
     bpy.utils.register_class(OOTP_OT_test_batch_bake_day)
     bpy.utils.register_class(OOTP_OT_test_selected_bake_day)
     bpy.utils.register_class(OOTP_OT_selected_batch_bake_day)
+    bpy.utils.register_class(OOTP_OT_selected_batch_shadow_bake_day)
+    bpy.utils.register_class(OOTP_OT_selected_batch_color_bake_day)
     bpy.utils.register_class(OOTP_open_config)
     bpy.utils.register_class(OOTP_reload_config)
     bpy.utils.register_class(OOTP_day_night_toggle)
@@ -1646,6 +1841,8 @@ def unregister():
     bpy.utils.unregister_class(OOTP_open_config)
     bpy.utils.unregister_class(OOTP_reload_config)
     bpy.utils.unregister_class(OOTP_day_night_toggle)
+    bpy.utils.umregister_class(OOTP_OT_selected_batch_shadow_bake_day)
+    bpy.utils.umregister_class(OOTP_OT_selected_batch_color_bake_day)
 
 if __name__ == "__main__":
     register()
