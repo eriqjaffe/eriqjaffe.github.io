@@ -288,14 +288,15 @@ class OOTP_OT_scene_cleaner(bpy.types.Operator):
         # add a camera for possible rendering later?
         
         cam_data = bpy.data.cameras.new(name="OOTP_Broadcast_Cam")
-        cam_data.lens = 23 # Wide angle mm
+        cam_data.lens = 28 # Wide angle mm
+        cam_data.sensor_width = 36
         
         cam_obj = bpy.data.objects.new("OOTP_Broadcast_Cam", cam_data)
         bpy.context.scene.collection.objects.link(cam_obj)
         bpy.context.scene.camera = cam_obj # Set as active render camera
         
         # 2. Position Camera behind Home Plate on the diagonal
-        cam_obj.location = (-17.0, -17.0, 40.0)
+        cam_obj.location = (-35.0, -35.0, 35.0)
         
         # 3. Add Track To Constraint pointing towards 2nd base
         target = bpy.data.objects.new("Cam_Target", None)
