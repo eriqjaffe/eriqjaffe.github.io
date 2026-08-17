@@ -1,7 +1,7 @@
 bl_info = {
     "name": "OOTP Ballpark Toolkit",
     "author": "Eriq Jaffe",
-    "version": (0, 7, 4, 1),
+    "version": (0, 7, 5),
     "blender": (4, 0, 0),
     "location": "3D Viewport > Main Top Bar (Next to Object Menu)",
     "description": "Custom workflow utilities for Out of the Park Baseball stadium creation.",
@@ -15,6 +15,7 @@ import sys
 import time
 import math
 import json
+import shutil
 from bpy_extras.io_utils import ExportHelper
 
 addon_keymaps = []
@@ -805,155 +806,357 @@ class OOTP_replace_selected_materials(bpy.types.Operator):
 # OOTP OBJ export with crowd replacements
 # ====================================================================        
 class WM_OT_ootp_ballpark_exporter(bpy.types.Operator, ExportHelper):
-    """Export OBJ for OOTP and automatically swap out crowd material blocks in the MTL file"""
+    """Export OBJ for OOTP, reorganize texture files into [Model Name]_Textures, and patch MTL references"""
+
     bl_idname = "wm.export_ootp_ballpark"
     bl_label = "Export OOTP Ballpark (.obj)"
-    
+
     filename_ext = ".obj"
-    filter_glob: bpy.props.StringProperty(default="*.obj", options={'HIDDEN'})
+    filter_glob: bpy.props.StringProperty(default="*.obj", options={"HIDDEN"})
 
     def execute(self, context):
         obj_filepath = self.filepath
         export_dir = os.path.dirname(obj_filepath)
         mtl_filepath = obj_filepath.replace(".obj", ".mtl")
-        
+
+        # ---------------------------------------------------------------------
+        # DETERMINE DYNAMIC TEXTURE FOLDER & BLEND DIRECTORY
+        # ---------------------------------------------------------------------
+        blend_filepath = bpy.data.filepath
+        if blend_filepath:
+            blend_dir = os.path.dirname(blend_filepath)
+            model_name = os.path.splitext(os.path.basename(blend_filepath))[0]
+            texture_folder_name = f"{model_name}_Textures"
+        else:
+            blend_dir = export_dir
+            texture_folder_name = "Textures"
+
+        textures_dir = os.path.join(export_dir, texture_folder_name)
+
+        # ---------------------------------------------------------------------
+        # STEP 1: UNPACK AND SAVE IMAGES FROM NOBAKE MESHES
+        # ---------------------------------------------------------------------
         for obj in context.scene.objects:
-            if "nobake" in obj.name.lower() and obj.type == 'MESH':
+            if "nobake" in obj.name.lower() and obj.type == "MESH":
                 for slot in obj.material_slots:
                     if slot.material and slot.material.use_nodes:
                         for node in slot.material.node_tree.nodes:
-                            if node.type == 'TEX_IMAGE' and node.image:
+                            if node.type == "TEX_IMAGE" and node.image:
                                 img = node.image
-                                target_img_path = os.path.join(export_dir, os.path.basename(img.filepath))
-                                
+                                target_img_path = os.path.join(
+                                    export_dir, os.path.basename(img.filepath)
+                                )
+
                                 if img.packed_file:
-                                    img.unpack(method='WRITE_LOCAL')
+                                    img.unpack(method="WRITE_LOCAL")
                                 else:
                                     try:
                                         img.save_render(target_img_path)
                                     except Exception:
                                         pass
-        
+
+        # ---------------------------------------------------------------------
+        # STEP 2: FLUSH GENERATED / DIRTY BAKE CANVASES TO DISK
+        # ---------------------------------------------------------------------
         for img in bpy.data.images:
-            if img.is_dirty or img.source == 'GENERATED':                
-                filename = img.name if img.name.lower().endswith(('.png', '.webp')) else f"{img.name}.png"               
-                full_save_path = os.path.join(bake_directory, filename)                
+            if img.is_dirty or img.source == "GENERATED":
+                filename = (
+                    img.name
+                    if img.name.lower().endswith((".png", ".webp"))
+                    else f"{img.name}.png"
+                )
+                full_save_path = os.path.join(export_dir, filename)
                 try:
-                    img.save_render(full_save_path, scene=context.scene)                    
+                    img.save_render(full_save_path, scene=context.scene)
                     img.filepath = full_save_path
-                    img.filepath_raw = full_save_path                    
-                    print(f"Successfully flushed bake canvas to disk: {full_save_path}")
+                    img.filepath_raw = full_save_path
+                    print(
+                        f"Successfully flushed bake canvas to disk: {full_save_path}"
+                    )
                 except Exception as e:
                     print(f"Could not save image {img.name}: {e}")
-                    
+
+        # ---------------------------------------------------------------------
+        # STEP 3: EXECUTE NATIVE OBJ EXPORT
+        # ---------------------------------------------------------------------
         bpy.ops.wm.obj_export(
             filepath=obj_filepath,
-            export_selected_objects=False,   
+            export_selected_objects=False,
             export_animation=False,
-            export_materials=True,           
-            export_pbr_extensions=False,     
-            path_mode='COPY',
-            forward_axis='NEGATIVE_Z',       
-            up_axis='Y',
-            export_triangulated_mesh=True   
+            export_materials=True,
+            export_pbr_extensions=False,
+            path_mode="COPY",
+            forward_axis="NEGATIVE_Z",
+            up_axis="Y",
+            export_triangulated_mesh=True,
         )
-        
+
+        # ---------------------------------------------------------------------
+        # STEP 4: PROCESS MTL FILE (REPLACE ATTENDANCE & MOVE TEXTURES)
+        # ---------------------------------------------------------------------
         if os.path.exists(mtl_filepath):
             try:
-                with open(mtl_filepath, 'r', encoding='utf-8') as f:
+                with open(mtl_filepath, "r", encoding="utf-8") as f:
                     mtl_content = f.read()
 
+                # --- PART A: CROWD / ATTENDANCE BLOCK REPLACEMENTS ---
                 replacements = [
-                    # --- BLUE ---
+                    # BLUE
                     {
                         "pattern": r"newmtl seating_attendance4_blue\b.*?(?=\n\n|\Z)",
-                        "replacement": "newmtl seating_attendance4_blue\nKa 0.000000 0.000000 0.000000\nKd 0.380392 0.384314 0.364706\nKs 0.000000 0.000000 0.000000\nNi 1.000000\nd 1.000000\nillum 1\nmap_Kd ../../attendance/seating_popularity4_blue.jpg"
+                        "replacement": (
+                            "newmtl seating_attendance4_blue\nKa 0.000000"
+                            " 0.000000 0.000000\nKd 0.380392 0.384314"
+                            " 0.364706\nKs 0.000000 0.000000 0.000000\nNi"
+                            " 1.000000\nd 1.000000\nillum 1\nmap_Kd"
+                            " ../../attendance/seating_popularity4_blue.jpg"
+                        ),
                     },
                     {
                         "pattern": r"newmtl seating_attendance3_blue\b.*?(?=\n\n|\Z)",
-                        "replacement": "newmtl seating_attendance3_blue\nKa 0.000000 0.000000 0.000000\nKd 0.364706 0.376471 0.352941\nKs 0.000000 0.000000 0.000000\nNi 1.000000\nd 1.000000\nillum 1\nmap_Kd ../../attendance/seating_popularity3_blue.jpg"
+                        "replacement": (
+                            "newmtl seating_attendance3_blue\nKa 0.000000"
+                            " 0.000000 0.000000\nKd 0.364706 0.376471"
+                            " 0.352941\nKs 0.000000 0.000000 0.000000\nNi"
+                            " 1.000000\nd 1.000000\nillum 1\nmap_Kd"
+                            " ../../attendance/seating_popularity3_blue.jpg"
+                        ),
                     },
                     {
                         "pattern": r"newmtl seating_attendance2_blue\b.*?(?=\n\n|\Z)",
-                        "replacement": "newmtl seating_attendance2_blue\nKa 0.000000 0.000000 0.000000\nKd 0.345098 0.380392 0.415686\nKs 0.000000 0.000000 0.000000\nNi 1.000000\nd 1.000000\nillum 1\nmap_Kd ../../attendance/seating_popularity2_blue.jpg"
+                        "replacement": (
+                            "newmtl seating_attendance2_blue\nKa 0.000000"
+                            " 0.000000 0.000000\nKd 0.345098 0.380392"
+                            " 0.415686\nKs 0.000000 0.000000 0.000000\nNi"
+                            " 1.000000\nd 1.000000\nillum 1\nmap_Kd"
+                            " ../../attendance/seating_popularity2_blue.jpg"
+                        ),
                     },
                     {
                         "pattern": r"newmtl seating_attendance1_blue\b.*?(?=\n\n|\Z)",
-                        "replacement": "newmtl seating_attendance1_blue\nKa 0.000000 0.000000 0.000000\nKd 0.309804 0.360784 0.419608\nKs 0.000000 0.000000 0.000000\nNi 1.000000\nd 1.000000\nillum 1\nmap_Kd ../../attendance/seating_popularity1_blue.jpg"
+                        "replacement": (
+                            "newmtl seating_attendance1_blue\nKa 0.000000"
+                            " 0.000000 0.000000\nKd 0.309804 0.360784"
+                            " 0.419608\nKs 0.000000 0.000000 0.000000\nNi"
+                            " 1.000000\nd 1.000000\nillum 1\nmap_Kd"
+                            " ../../attendance/seating_popularity1_blue.jpg"
+                        ),
                     },
-                    
-                    # --- RED ---
+                    # RED
                     {
                         "pattern": r"newmtl seating_attendance4_red\b.*?(?=\n\n|\Z)",
-                        "replacement": "newmtl seating_attendance4_red\nKa 0.000000 0.000000 0.000000\nKd 0.380392 0.384314 0.364706\nKs 0.000000 0.000000 0.000000\nNi 1.000000\nd 1.000000\nillum 1\nmap_Kd ../../attendance/seating_popularity4_red.jpg"
+                        "replacement": (
+                            "newmtl seating_attendance4_red\nKa 0.000000"
+                            " 0.000000 0.000000\nKd 0.380392 0.384314"
+                            " 0.364706\nKs 0.000000 0.000000 0.000000\nNi"
+                            " 1.000000\nd 1.000000\nillum 1\nmap_Kd"
+                            " ../../attendance/seating_popularity4_red.jpg"
+                        ),
                     },
                     {
                         "pattern": r"newmtl seating_attendance3_red\b.*?(?=\n\n|\Z)",
-                        "replacement": "newmtl seating_attendance3_red\nKa 0.000000 0.000000 0.000000\nKd 0.364706 0.376471 0.352941\nKs 0.000000 0.000000 0.000000\nNi 1.000000\nd 1.000000\nillum 1\nmap_Kd ../../attendance/seating_popularity3_red.jpg"
+                        "replacement": (
+                            "newmtl seating_attendance3_red\nKa 0.000000"
+                            " 0.000000 0.000000\nKd 0.364706 0.376471"
+                            " 0.352941\nKs 0.000000 0.000000 0.000000\nNi"
+                            " 1.000000\nd 1.000000\nillum 1\nmap_Kd"
+                            " ../../attendance/seating_popularity3_red.jpg"
+                        ),
                     },
                     {
                         "pattern": r"newmtl seating_attendance2_red\b.*?(?=\n\n|\Z)",
-                        "replacement": "newmtl seating_attendance2_red\nKa 0.000000 0.000000 0.000000\nKd 0.345098 0.380392 0.415686\nKs 0.000000 0.000000 0.000000\nNi 1.000000\nd 1.000000\nillum 1\nmap_Kd ../../attendance/seating_popularity2_red.jpg"
+                        "replacement": (
+                            "newmtl seating_attendance2_red\nKa 0.000000"
+                            " 0.000000 0.000000\nKd 0.345098 0.380392"
+                            " 0.415686\nKs 0.000000 0.000000 0.000000\nNi"
+                            " 1.000000\nd 1.000000\nillum 1\nmap_Kd"
+                            " ../../attendance/seating_popularity2_red.jpg"
+                        ),
                     },
                     {
                         "pattern": r"newmtl seating_attendance1_red\b.*?(?=\n\n|\Z)",
-                        "replacement": "newmtl seating_attendance1_red\nKa 0.000000 0.000000 0.000000\nKd 0.309804 0.360784 0.419608\nKs 0.000000 0.000000 0.000000\nNi 1.000000\nd 1.000000\nillum 1\nmap_Kd ../../attendance/seating_popularity1_red.jpg"
+                        "replacement": (
+                            "newmtl seating_attendance1_red\nKa 0.000000"
+                            " 0.000000 0.000000\nKd 0.309804 0.360784"
+                            " 0.419608\nKs 0.000000 0.000000 0.000000\nNi"
+                            " 1.000000\nd 1.000000\nillum 1\nmap_Kd"
+                            " ../../attendance/seating_popularity1_red.jpg"
+                        ),
                     },
-
-                    # --- GREY ---
+                    # GREY
                     {
                         "pattern": r"newmtl seating_attendance4_grey\b.*?(?=\n\n|\Z)",
-                        "replacement": "newmtl seating_attendance4_grey\nKa 0.000000 0.000000 0.000000\nKd 0.380392 0.384314 0.364706\nKs 0.000000 0.000000 0.000000\nNi 1.000000\nd 1.000000\nillum 1\nmap_Kd ../../attendance/seating_popularity4_grey.jpg"
+                        "replacement": (
+                            "newmtl seating_attendance4_grey\nKa 0.000000"
+                            " 0.000000 0.000000\nKd 0.380392 0.384314"
+                            " 0.364706\nKs 0.000000 0.000000 0.000000\nNi"
+                            " 1.000000\nd 1.000000\nillum 1\nmap_Kd"
+                            " ../../attendance/seating_popularity4_grey.jpg"
+                        ),
                     },
                     {
                         "pattern": r"newmtl seating_attendance3_grey\b.*?(?=\n\n|\Z)",
-                        "replacement": "newmtl seating_attendance3_grey\nKa 0.000000 0.000000 0.000000\nKd 0.364706 0.376471 0.352941\nKs 0.000000 0.000000 0.000000\nNi 1.000000\nd 1.000000\nillum 1\nmap_Kd ../../attendance/seating_popularity3_grey.jpg"
+                        "replacement": (
+                            "newmtl seating_attendance3_grey\nKa 0.000000"
+                            " 0.000000 0.000000\nKd 0.364706 0.376471"
+                            " 0.352941\nKs 0.000000 0.000000 0.000000\nNi"
+                            " 1.000000\nd 1.000000\nillum 1\nmap_Kd"
+                            " ../../attendance/seating_popularity3_grey.jpg"
+                        ),
                     },
                     {
                         "pattern": r"newmtl seating_attendance2_grey\b.*?(?=\n\n|\Z)",
-                        "replacement": "newmtl seating_attendance2_grey\nKa 0.000000 0.000000 0.000000\nKd 0.345098 0.380392 0.415686\nKs 0.000000 0.000000 0.000000\nNi 1.000000\nd 1.000000\nillum 1\nmap_Kd ../../attendance/seating_popularity2_grey.jpg"
+                        "replacement": (
+                            "newmtl seating_attendance2_grey\nKa 0.000000"
+                            " 0.000000 0.000000\nKd 0.345098 0.380392"
+                            " 0.415686\nKs 0.000000 0.000000 0.000000\nNi"
+                            " 1.000000\nd 1.000000\nillum 1\nmap_Kd"
+                            " ../../attendance/seating_popularity2_grey.jpg"
+                        ),
                     },
                     {
                         "pattern": r"newmtl seating_attendance1_grey\b.*?(?=\n\n|\Z)",
-                        "replacement": "newmtl seating_attendance1_grey\nKa 0.000000 0.000000 0.000000\nKd 0.309804 0.360784 0.419608\nKs 0.000000 0.000000 0.000000\nNi 1.000000\nd 1.000000\nillum 1\nmap_Kd ../../attendance/seating_popularity1_grey.jpg"
+                        "replacement": (
+                            "newmtl seating_attendance1_grey\nKa 0.000000"
+                            " 0.000000 0.000000\nKd 0.309804 0.360784"
+                            " 0.419608\nKs 0.000000 0.000000 0.000000\nNi"
+                            " 1.000000\nd 1.000000\nillum 1\nmap_Kd"
+                            " ../../attendance/seating_popularity1_grey.jpg"
+                        ),
                     },
-
-                    # --- GREEN ---
+                    # GREEN
                     {
                         "pattern": r"newmtl crowd_new_4\b.*?(?=\n\n|\Z)",
-                        "replacement": "newmtl crowd_new_4\nKa 0.000000 0.000000 0.000000\nKd 0.380392 0.384314 0.364706\nKs 0.000000 0.000000 0.000000\nKe 0.000000 0.000000 0.000000\nNi 1.000000\nd 1.000000\nillum 1\nmap_Kd ../../attendance/seating_popularity4.jpg"
+                        "replacement": (
+                            "newmtl crowd_new_4\nKa 0.000000 0.000000"
+                            " 0.000000\nKd 0.380392 0.384314 0.364706\nKs"
+                            " 0.000000 0.000000 0.000000\nKe 0.000000 0.000000"
+                            " 0.000000\nNi 1.000000\nd 1.000000\nillum"
+                            " 1\nmap_Kd"
+                            " ../../attendance/seating_popularity4.jpg"
+                        ),
                     },
                     {
                         "pattern": r"newmtl Crowd_new_3\b.*?(?=\n\n|\Z)",
-                        "replacement": "newmtl Crowd_new_3\nKa 0.000000 0.000000 0.000000\nKd 0.364706 0.376471 0.352941\nKs 0.000000 0.000000 0.000000\nKe 0.000000 0.000000 0.000000\nNi 1.000000\nd 1.000000\nillum 1\nmap_Kd ../../attendance/seating_popularity3.jpg"
+                        "replacement": (
+                            "newmtl Crowd_new_3\nKa 0.000000 0.000000"
+                            " 0.000000\nKd 0.364706 0.376471 0.352941\nKs"
+                            " 0.000000 0.000000 0.000000\nKe 0.000000 0.000000"
+                            " 0.000000\nNi 1.000000\nd 1.000000\nillum"
+                            " 1\nmap_Kd"
+                            " ../../attendance/seating_popularity3.jpg"
+                        ),
                     },
                     {
                         "pattern": r"newmtl crowd_new_2\b.*?(?=\n\n|\Z)",
-                        "replacement": "newmtl crowd_new_2\nKa 0.000000 0.000000 0.000000\nKd 0.321569 0.360784 0.309804\nKs 0.000000 0.000000 0.000000\nKe 0.000000 0.000000 0.000000\nNi 1.000000\nd 1.000000\nillum 1\nmap_Kd ../../attendance/seating_popularity2.jpg"
+                        "replacement": (
+                            "newmtl crowd_new_2\nKa 0.000000 0.000000"
+                            " 0.000000\nKd 0.321569 0.360784 0.309804\nKs"
+                            " 0.000000 0.000000 0.000000\nKe 0.000000 0.000000"
+                            " 0.000000\nNi 1.000000\nd 1.000000\nillum"
+                            " 1\nmap_Kd"
+                            " ../../attendance/seating_popularity2.jpg"
+                        ),
                     },
                     {
                         "pattern": r"newmtl crowd_new_1\b.*?(?=\n\n|\Z)",
-                        "replacement": "newmtl crowd_new_1\nKa 0.000000 0.000000 0.000000\nKd 0.286275 0.349020 0.274510\nKs 0.000000 0.000000 0.000000\nKe 0.000000 0.000000 0.000000\nNi 1.000000\nd 1.000000\nillum 1\nmap_Kd ../../attendance/seating_popularity1.jpg"
-                    }
+                        "replacement": (
+                            "newmtl crowd_new_1\nKa 0.000000 0.000000"
+                            " 0.000000\nKd 0.286275 0.349020 0.274510\nKs"
+                            " 0.000000 0.000000 0.000000\nKe 0.000000 0.000000"
+                            " 0.000000\nNi 1.000000\nd 1.000000\nillum"
+                            " 1\nmap_Kd"
+                            " ../../attendance/seating_popularity1.jpg"
+                        ),
+                    },
                 ]
 
                 patch_count = 0
                 for item in replacements:
                     if re.search(item["pattern"], mtl_content, flags=re.DOTALL):
-                        mtl_content = re.sub(item["pattern"], item["replacement"], mtl_content, flags=re.DOTALL)
+                        mtl_content = re.sub(
+                            item["pattern"],
+                            item["replacement"],
+                            mtl_content,
+                            flags=re.DOTALL,
+                        )
                         patch_count += 1
 
-                with open(mtl_filepath, 'w', encoding='utf-8') as f:
-                    f.write(mtl_content)
-                    
-                self.report({'INFO'}, f"Export complete. Successfully patched {patch_count} active definitions.")
-                
-            except Exception as e:
-                self.report({'ERROR'}, f"Failed parsing MTL textures: {str(e)}")
-        else:
-            self.report({'WARNING'}, "OBJ Exported, but no tracking MTL found to override.")
+                # --- PART B: MOVE TEXTURES & EDIT MAP_KD REFERENCES ---
+                def process_and_move(match):
+                    prefix = match.group(1)  # map_Kd or map_d
+                    filename = match.group(2)  # e.g., Quartz_Light_Grey1_day.png
 
-        return {'FINISHED'}
+                    night_filename = filename.replace("_day", "_night")
+
+                    source_file = os.path.join(export_dir, filename)
+                    dest_file = os.path.join(textures_dir, filename)
+
+                    if not os.path.exists(textures_dir):
+                        os.makedirs(textures_dir)
+
+                    # Move main texture (clobbering if exists)
+                    if os.path.isfile(source_file):
+                        if os.path.exists(dest_file):
+                            os.remove(dest_file)
+                        shutil.move(source_file, dest_file)
+
+                    # Check for and move corresponding _night texture if present
+                    if night_filename != filename:
+                        source_night = os.path.join(blend_dir, night_filename)
+                        if not os.path.isfile(source_night):
+                            source_night = os.path.join(export_dir, night_filename)
+
+                        dest_night = os.path.join(textures_dir, night_filename)
+
+                        if os.path.isfile(source_night):
+                            if os.path.exists(dest_night):
+                                os.remove(dest_night)
+                            shutil.move(source_night, dest_night)
+
+                    return f"{prefix} {texture_folder_name}/{filename}"
+
+                # Match lines like 'map_Kd my_image.png' that aren't already prefixed with a directory
+                texture_pattern = r"^(map_K?d)\s+(?!(?:\.\.|[^/\n]+/))([^\r\n]*)"
+                mtl_content = re.sub(
+                    texture_pattern,
+                    process_and_move,
+                    mtl_content,
+                    flags=re.MULTILINE,
+                )
+
+                # Save the modified MTL file
+                with open(mtl_filepath, "w", encoding="utf-8") as f:
+                    f.write(mtl_content)
+
+                # ---------------------------------------------------------------------
+                # STEP 5: CLEANUP ORPHANED ATTENDANCE / CROWD TEXTURES IN EXPORT DIR
+                # ---------------------------------------------------------------------
+                for file_name in os.listdir(export_dir):
+                    lower_name = file_name.lower()
+                    if lower_name.startswith(("seating_attendance", "crowd_new")):
+                        orphaned_path = os.path.join(export_dir, file_name)
+                        if os.path.isfile(orphaned_path):
+                            try:
+                                os.remove(orphaned_path)
+                            except Exception:
+                                pass
+
+                self.report(
+                    {"INFO"},
+                    f"Export complete. Patched {patch_count} attendance materials, reorganized to '{texture_folder_name}', and cleaned up unused textures.",
+                )
+
+            except Exception as e:
+                self.report(
+                    {"ERROR"}, f"Failed parsing MTL textures: {str(e)}"
+                )
+        else:
+            self.report(
+                {"WARNING"}, "OBJ Exported, but no tracking MTL found to override."
+            )
+
+        return {"FINISHED"}
 
 # ====================================================================
 # Bake all components that aren't tagged "nobake"
