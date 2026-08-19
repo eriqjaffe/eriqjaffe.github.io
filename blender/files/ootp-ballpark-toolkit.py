@@ -1,7 +1,7 @@
 bl_info = {
     "name": "OOTP Ballpark Toolkit",
     "author": "Eriq Jaffe",
-    "version": (0, 7, 5),
+    "version": (0, 7, 5, 1),
     "blender": (4, 0, 0),
     "location": "3D Viewport > Main Top Bar (Next to Object Menu)",
     "description": "Custom workflow utilities for Out of the Park Baseball stadium creation.",
@@ -87,7 +87,7 @@ def set_default_sky_texture(world):
 
     node_sky.sky_type = sky_data.get('sky_type') 
     node_sky.sun_intensity = sky_data.get('sun_intensity')
-    node_sky.sun_elevation = math.radians(sky_data.get('sun_rotation'))
+    node_sky.sun_elevation = math.radians(sky_data.get('sun_elevation'))
     node_sky.sun_rotation = math.radians(sky_data.get('sun_rotation'))
 
     node_background.inputs['Strength'].default_value = sky_data.get('strength')
@@ -1858,7 +1858,11 @@ class OOTP_day_night_toggle(bpy.types.Operator):
         sky_defaults = USER_SETTINGS.get("sky_texture_defaults", {})
         emission_defaults = USER_SETTINGS.get("material_emission_defaults", {})
         
-        is_night = node_sky.sun_intensity < 0.05
+        if not node_sky:
+            set_default_sky_texture(world)
+            return {'FINISHED'}
+        
+        is_night = node_sky.sun_intensity < 0.05 if node_sky else True
 
         if not is_night:
             # --- GOING TO NIGHT ---
