@@ -1,7 +1,7 @@
 bl_info = {
     "name": "OOTP Ballpark Toolkit",
     "author": "Eriq Jaffe",
-    "version": (0, 5),
+    "version": (0, 7, 5, 1),
     "blender": (4, 0, 0),
     "location": "3D Viewport > Main Top Bar (Next to Object Menu)",
     "description": "Custom workflow utilities for Out of the Park Baseball stadium creation.",
@@ -14,28 +14,87 @@ import re
 import sys
 import time
 import math
+import json
+import shutil
 from bpy_extras.io_utils import ExportHelper
+
+addon_keymaps = []
+
+CONFIG_DIR = bpy.utils.user_resource('CONFIG', path="ootp-ballpark-toolkit", create=True)
+CONFIG_FILE_PATH = os.path.join(CONFIG_DIR, "defaults.json")
+
+FALLBACK_DEFAULTS = {
+    "sky_texture_defaults": {
+        "sky_type": "MULTIPLE_SCATTERING",
+        "sun_intensity": 0.200,
+        "sun_elevation": 27,
+        "sun_rotation": -190,
+        "strength": 0.200
+    },
+    "material_emission_defaults": {}
+}
+
+USER_SETTINGS = {} 
+
+def load_user_defaults():
+    """Loads settings from the JSON file, or creates it with fallbacks if missing."""
+    if not os.path.exists(CONFIG_FILE_PATH):
+        try:
+            with open(CONFIG_FILE_PATH, 'w', encoding='utf-8') as f:
+                json.dump(FALLBACK_DEFAULTS, f, indent=4)
+            return FALLBACK_DEFAULTS
+        except IOError:
+            print(f"Add-on Warning: Could not write default file to {CONFIG_FILE_PATH}")
+            return FALLBACK_DEFAULTS
+
+    try:
+        with open(CONFIG_FILE_PATH, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError) as e:
+        print(f"Add-on Error: Failed to parse custom JSON. Using defaults. Error: {e}")
+        return FALLBACK_DEFAULTS
 
 def ensure_system_console_open():
     """Ensures the Windows system console is open without accidentally toggling it closed."""
     if sys.platform == 'win32':
         import ctypes
-        
-        # Get the handle of the console window associated with Blender
-        # If no console is attached, this returns 0 (Null)
         console_handle = ctypes.windll.kernel32.GetConsoleWindow()
-        
-        # Also check if the window is currently visible to the user
         is_visible = ctypes.windll.user32.IsWindowVisible(console_handle) if console_handle else False
-        
-        # If the console window handle doesn't exist, or it exists but is hidden, safely turn it on
         if not console_handle or not is_visible:
             try:
                 bpy.ops.wm.console_toggle()
             except Exception as e:
                 print(f"Failed to toggle console: {e}")
 
+def set_default_sky_texture(world):
+    # set default daytime lighting
+    node_tree = world.node_tree
+    nodes = node_tree.nodes
+    links = node_tree.links
 
+    nodes.clear()
+
+    node_output = nodes.new(type='ShaderNodeOutputWorld')
+    node_output.location = (400, 0)
+
+    node_background = nodes.new(type='ShaderNodeBackground')
+    node_background.location = (200, 0)
+
+    node_sky = nodes.new(type='ShaderNodeTexSky')
+    node_sky.location = (0, 0)
+    
+    sky_data = USER_SETTINGS.get("sky_texture_defaults", {})
+
+    node_sky.sky_type = sky_data.get('sky_type') 
+    node_sky.sun_intensity = sky_data.get('sun_intensity')
+    node_sky.sun_elevation = math.radians(sky_data.get('sun_elevation'))
+    node_sky.sun_rotation = math.radians(sky_data.get('sun_rotation'))
+
+    node_background.inputs['Strength'].default_value = sky_data.get('strength')
+
+    links.new(node_sky.outputs['Color'], node_background.inputs['Color'])
+    links.new(node_background.outputs['Background'], node_output.inputs['Surface'])
+    
 # ====================================================================
 # Global Scene Cleanup (Renamed Class & ID)
 # ====================================================================
@@ -45,7 +104,13 @@ class OOTP_OT_scene_cleaner(bpy.types.Operator):
     bl_label = "Clean Scene & Isolate Materials"
     bl_options = {'REGISTER', 'UNDO'}
     
-    def execute(self, context):
+    def execute(self, context): 
+        if not bpy.data.filepath:
+            self.report({'ERROR'}, "Save your .blend file first!")
+            return {'CANCELLED'}
+            
+        ensure_system_console_open()
+        
         if bpy.ops.object.mode_set.poll():
             bpy.ops.object.mode_set(mode='OBJECT')
 
@@ -53,10 +118,10 @@ class OOTP_OT_scene_cleaner(bpy.types.Operator):
 
         if loose_obj_name in bpy.data.objects:
             loose_obj = bpy.data.objects[loose_obj_name]
-            
-            # Rename it to match your automated unwrap filter rules
             loose_obj.name = "_(Loose Entity)_nobake"
+            
         mesh_count = 0
+        
         for obj in context.scene.objects:                
             if "nobake" in obj.name.lower():
                 continue
@@ -64,11 +129,12 @@ class OOTP_OT_scene_cleaner(bpy.types.Operator):
             if obj.type == 'MESH':
                 mesh_count += 1
                 
-                
                 display_name = obj.name
                 if display_name.startswith("C-"):
                     display_name = display_name.replace("C-", "", 1)
                     
+                print(f"Processing {display_name}...")
+                
                 mesh = obj.data
                 default_slot_indices = [i for i, slot in enumerate(obj.material_slots) if slot.material and slot.material.name == "DefaultMaterial"]
                 
@@ -118,9 +184,9 @@ class OOTP_OT_scene_cleaner(bpy.types.Operator):
                         new_mat.name = f"{orig_name}_{display_name}"
                         slot.material = new_mat
 
-                # Create Blank Bake Target Image
-                clean_img_name = f"{display_name.replace(' ', '_')}_bake"
+                clean_img_name = f"{display_name.replace(' ', '_')}_day.png"
 
+                # Bake target
                 if clean_img_name not in bpy.data.images:
                     bake_image = bpy.data.images.new(
                         name=clean_img_name,
@@ -130,12 +196,20 @@ class OOTP_OT_scene_cleaner(bpy.types.Operator):
                     )
                     bake_image.generated_color = (0.0, 0.0, 0.0, 0.0)
                     
-                    data_size = 1024 * 1024 * 4
-                    bake_image.pack(data=bytes(data_size), data_len=data_size)
+                    blend_dir = bpy.path.abspath("//")
+                    if blend_dir:
+                        save_path = os.path.join(blend_dir, clean_img_name)    
+                        bake_image.filepath_raw = save_path
+                        bake_image.file_format = 'PNG'
+                        bake_image.save()                   
+                        bake_image.filepath = bpy.path.relpath(save_path)
+                        bake_image.pack()
+                    else:
+                        print("Warning: Save your .blend file first so the script knows where to store images!")
+
                 else:
                     bake_image = bpy.data.images[clean_img_name]
 
-                # Add and Wire Shader Bake Nodes
                 for slot in obj.material_slots:
                     mat = slot.material
                     if not mat or not mat.use_nodes:
@@ -184,37 +258,55 @@ class OOTP_OT_scene_cleaner(bpy.types.Operator):
                     tgt_tex_node.select = True
                     nodes.active = tgt_tex_node
 
+        # sky texture
         world = bpy.context.scene.world
         world.use_nodes = True
         nodes = world.node_tree.nodes
         links = world.node_tree.links
         
-        # 2. Clear out any existing nodes to prevent overlapping wires
         nodes.clear()
         
-        # 3. Create the essential World nodes
         world_output = nodes.new(type='ShaderNodeOutputWorld')
         background = nodes.new(type='ShaderNodeBackground')
         sky_texture = nodes.new(type='ShaderNodeTexSky')
         
-        # Position them cleanly in the node graph (optional, but nice for readability)
         sky_texture.location = (-300, 0)
         background.location = (0, 0)
         world_output.location = (200, 0)
         
-        # 4. Configure your preferred Sky Model type
-        # 'NISHITA' is standard for realistic day/night sun elevations
-        sky_texture.sky_type = 'MULTIPLE_SCATTERING' 
+        sky_data = USER_SETTINGS.get("sky_texture_defaults", {})
         
-        # Tweak these values to hit your daytime sweet spot
-        sky_texture.sun_elevation = math.radians(25)     # Angle above the horizon (higher = midday)
-        sky_texture.sun_rotation = math.radians(-190)        # Direction the shadows cast
-        sky_texture.sun_intensity = 0.2        # Power of the sun disk
-        background.inputs['Strength'].default_value = 0.2  # Overall ambient brightness
+        sky_texture.sky_type = sky_data.get('sky_type') 
         
-        # 5. Wire the nodes together
+        sky_texture.sun_elevation = math.radians(sky_data.get('sun_elevation'))
+        sky_texture.sun_rotation = math.radians(sky_data.get('sun_rotation'))
+        sky_texture.sun_intensity = sky_data.get('sun_intensity')
+        background.inputs['Strength'].default_value = sky_data.get('strength')
+        
         links.new(sky_texture.outputs['Color'], background.inputs['Color'])
         links.new(background.outputs['Background'], world_output.inputs['Surface'])
+        
+        # add a camera for possible rendering later?
+        
+        cam_data = bpy.data.cameras.new(name="OOTP_Broadcast_Cam")
+        cam_data.lens = 23 # Wide angle mm
+        
+        cam_obj = bpy.data.objects.new("OOTP_Broadcast_Cam", cam_data)
+        bpy.context.scene.collection.objects.link(cam_obj)
+        bpy.context.scene.camera = cam_obj # Set as active render camera
+        
+        # 2. Position Camera behind Home Plate on the diagonal
+        cam_obj.location = (-17.0, -17.0, 40.0)
+        
+        # 3. Add Track To Constraint pointing towards 2nd base
+        target = bpy.data.objects.new("Cam_Target", None)
+        bpy.context.scene.collection.objects.link(target)
+        target.location = (20.0, 20.0, 1.0) # Pitcher / 2nd Base area
+        
+        constraint = cam_obj.constraints.new(type='TRACK_TO')
+        constraint.target = target
+        constraint.track_axis = 'TRACK_NEGATIVE_Z'
+        constraint.up_axis = 'UP_Y'
         
         self.report({'INFO'}, f"Processed {mesh_count} components. All UV maps, bakes, and target nodes configured!")
         return {'FINISHED'}
@@ -298,74 +390,86 @@ class OOTP_selected_scene_cleaner(bpy.types.Operator):
                             slot.material = new_mat
 
                     # Create Blank Bake Target Image
-                    clean_img_name = f"{display_name.replace(' ', '_')}_bake"
+                    clean_img_name = f"{display_name.replace(' ', '_')}_day.png"  # Added extension
 
-                    if clean_img_name not in bpy.data.images:
-                        bake_image = bpy.data.images.new(
-                            name=clean_img_name,
-                            width=1024,
-                            height=1024,
-                            alpha=True
-                        )
-                        bake_image.generated_color = (0.0, 0.0, 0.0, 0.0)
+                if clean_img_name not in bpy.data.images:
+                    print(f"No bake image found...")
+                    bake_image = bpy.data.images.new(
+                        name=clean_img_name,
+                        width=1024,
+                        height=1024,
+                        alpha=True
+                    )
+                    bake_image.generated_color = (0.0, 0.0, 0.0, 0.0)
+                    
+                    blend_dir = bpy.path.abspath("//")
+                    if blend_dir:
+                        save_path = os.path.join(blend_dir, clean_img_name)
                         
-                        data_size = 1024 * 1024 * 4
-                        bake_image.pack(data=bytes(data_size), data_len=data_size)
+                        bake_image.filepath_raw = save_path
+                        bake_image.file_format = 'PNG'
+                        bake_image.save()
+                        
+                        bake_image.filepath = bpy.path.relpath(save_path)
+                        
+                        bake_image.pack()
                     else:
-                        bake_image = bpy.data.images[clean_img_name]
+                        print("Warning: Save your .blend file first so the script knows where to store images!")
 
-                    # Add and Wire Shader Bake Nodes
-                    for slot in obj.material_slots:
-                        mat = slot.material
-                        if not mat or not mat.use_nodes:
-                            continue
-                            
-                        nodes = mat.node_tree.nodes
-                        links = mat.node_tree.links
-                        
-                        for node in nodes:
-                            node.select = False
-                            
-                        source_tex_node = next((n for n in nodes if n.type == 'TEX_IMAGE' and n.label != "Bake Target"), None)
-                        output_node = next((n for n in nodes if n.type == 'OUTPUT_MATERIAL'), None)
-                        principled_node = next((n for n in nodes if n.type == 'BSDF_PRINCIPLED'), None)
-                        
-                        if output_node:
-                            right_x = output_node.location.x + 200
-                            right_y = output_node.location.y
-                        else:
-                            right_x = 600
-                            right_y = 300
+                else:
+                    print(f"Bake Image Found")
+                    bake_image = bpy.data.images[clean_img_name]
 
-                        uv_src_node = nodes.new(type='ShaderNodeUVMap')
-                        uv_src_node.uv_map = source_uv.name
+                for slot in obj.material_slots:
+                    mat = slot.material
+                    if not mat or not mat.use_nodes:
+                        continue
                         
-                        if source_tex_node:
-                            links.new(uv_src_node.outputs['UV'], source_tex_node.inputs['Vector'])
-                            uv_src_node.location = (source_tex_node.location.x - 300, source_tex_node.location.y)
-                        else:
-                            uv_src_node.location = (right_x - 600, right_y)
-                            
-                        if source_tex_node and principled_node:
-                            links.new(source_tex_node.outputs['Alpha'], principled_node.inputs['Alpha'])
-                            
-                        uv_tgt_node = nodes.new(type='ShaderNodeUVMap')
-                        uv_tgt_node.uv_map = target_uv.name
-                        uv_tgt_node.location = (right_x, right_y)
+                    nodes = mat.node_tree.nodes
+                    links = mat.node_tree.links
+                    
+                    for node in nodes:
+                        node.select = False
                         
-                        tgt_tex_node = nodes.new(type='ShaderNodeTexImage')
-                        tgt_tex_node.image = bake_image
-                        tgt_tex_node.label = "Bake Target"
-                        tgt_tex_node.location = (right_x + 300, right_y)
-                            
-                        links.new(uv_tgt_node.outputs['UV'], tgt_tex_node.inputs['Vector'])
+                    source_tex_node = next((n for n in nodes if n.type == 'TEX_IMAGE' and n.label != "Bake Target"), None)
+                    output_node = next((n for n in nodes if n.type == 'OUTPUT_MATERIAL'), None)
+                    principled_node = next((n for n in nodes if n.type == 'BSDF_PRINCIPLED'), None)
+                    
+                    if output_node:
+                        right_x = output_node.location.x + 200
+                        right_y = output_node.location.y
+                    else:
+                        right_x = 600
+                        right_y = 300
+
+                    uv_src_node = nodes.new(type='ShaderNodeUVMap')
+                    uv_src_node.uv_map = source_uv.name
+                    
+                    if source_tex_node:
+                        links.new(uv_src_node.outputs['UV'], source_tex_node.inputs['Vector'])
+                        uv_src_node.location = (source_tex_node.location.x - 300, source_tex_node.location.y)
+                    else:
+                        uv_src_node.location = (right_x - 600, right_y)
                         
-                        tgt_tex_node.select = True
-                        nodes.active = tgt_tex_node
+                    if source_tex_node and principled_node:
+                        links.new(source_tex_node.outputs['Alpha'], principled_node.inputs['Alpha'])
+                        
+                    uv_tgt_node = nodes.new(type='ShaderNodeUVMap')
+                    uv_tgt_node.uv_map = target_uv.name
+                    uv_tgt_node.location = (right_x, right_y)
+                    
+                    tgt_tex_node = nodes.new(type='ShaderNodeTexImage')
+                    tgt_tex_node.image = bake_image
+                    tgt_tex_node.label = "Bake Target"
+                    tgt_tex_node.location = (right_x + 300, right_y)
+                        
+                    links.new(uv_tgt_node.outputs['UV'], tgt_tex_node.inputs['Vector'])
+                    
+                    tgt_tex_node.select = True
+                    nodes.active = tgt_tex_node
 
         self.report({'INFO'}, f"Processed {mesh_count} components. All UV maps, bakes, and target nodes configured!")
         return {'FINISHED'}
-
 
 # ====================================================================
 # UV Unwrap entire model
@@ -390,23 +494,13 @@ class OOTP_UV_unwrap_global(bpy.types.Operator):
 
         unwrapped_count = 0
         
-        # Deselect everything first to maintain a clean state
         bpy.ops.object.select_all(action='DESELECT')
 
         for obj in target_objects:
-            # 1. Set the target object as the active, selected element
             context.view_layer.objects.active = obj
             obj.select_set(True)
-            
-            # 2. Switch to Edit Mode to access geometry operations
             bpy.ops.object.mode_set(mode='EDIT')
-            
-            # 3. Select all geometry faces within the mesh
             bpy.ops.mesh.select_all(action='SELECT')
-            
-            # 4. Run the Smart UV Project operator
-            # angle_limit=66: Great default for architectural/stadium geometry blocks
-            # island_margin=0.01: CRUCIAL padding to prevent baked lighting bleeding edge-to-edge
             bpy.ops.uv.smart_project(
                 angle_limit=66.0, 
                 island_margin=0.02, 
@@ -422,7 +516,6 @@ class OOTP_UV_unwrap_global(bpy.types.Operator):
                 shape_method='CONCAVE'
             )
             
-            # 5. Return safely to Object Mode and deselect
             bpy.ops.object.mode_set(mode='OBJECT')
             obj.select_set(False)
             
@@ -455,23 +548,13 @@ class OOTP_UV_unwrap_selected(bpy.types.Operator):
         
         print(f"Starting Smart UV Unwrap on {len(target_objects)} components...")
 
-        # Deselect everything first to maintain a clean state
         bpy.ops.object.select_all(action='DESELECT')
 
         for obj in target_objects:
-            # 1. Set the target object as the active, selected element
             context.view_layer.objects.active = obj
             obj.select_set(True)
-            
-            # 2. Switch to Edit Mode to access geometry operations
             bpy.ops.object.mode_set(mode='EDIT')
-            
-            # 3. Select all geometry faces within the mesh
             bpy.ops.mesh.select_all(action='SELECT')
-            
-            # 4. Run the Smart UV Project operator
-            # angle_limit=66: Great default for architectural/stadium geometry blocks
-            # island_margin=0.01: CRUCIAL padding to prevent baked lighting bleeding edge-to-edge
             bpy.ops.uv.smart_project(
                 angle_limit=66.0, 
                 island_margin=0.02, 
@@ -487,7 +570,6 @@ class OOTP_UV_unwrap_selected(bpy.types.Operator):
                 shape_method='CONCAVE'
             )
             
-            # 5. Return safely to Object Mode and deselect
             bpy.ops.object.mode_set(mode='OBJECT')
             obj.select_set(False)
             
@@ -564,13 +646,14 @@ class OOTP_replace_all_materials(bpy.types.Operator):
         
         mesh_objects = [obj for obj in context.scene.objects if "nobake" not in obj.name.lower() and obj.type == 'MESH']
         mesh_objects = sorted(mesh_objects, key=lambda obj: obj.name.lower())
+        
+        replaced_count = 0
     
         for obj in mesh_objects:
             if "nobake" in obj.name.lower():
                 continue
             
             if obj.type == 'MESH':
-                #mesh_count += 1
                 obj_name = obj.name
                 mat_name = obj_name[2:] if obj_name.startswith("C-") else obj_name
                 
@@ -600,188 +683,480 @@ class OOTP_replace_all_materials(bpy.types.Operator):
                 clean_img_name = f"{mat_name.replace(' ', '_')}_day.png"
                 
                 if bpy.data.is_saved:
-                    blend_dir = os.path.dirname(bpy.data.filepath)
-                    # Combine the folder path with your clean image name
+                    absolute_blend_path = bpy.path.abspath(bpy.data.filepath)
+                    blend_dir = os.path.dirname(absolute_blend_path)
                     full_image_path = os.path.join(blend_dir, clean_img_name)
                     
-                    # 3. Check if the file actually exists on your hard drive before loading
                     if os.path.exists(full_image_path):
                         try:
-                            # Load the image safely into the texture node
-                            baked_texture = bpy.data.images.load(full_image_path, check_existing=True)
+                            if clean_img_name in bpy.data.images:
+                                baked_texture = bpy.data.images[clean_img_name]
+                                
+                                if baked_texture.packed_file:
+                                    baked_texture.unpack(method='USE_LOCAL')
+                                baked_texture.filepath = full_image_path
+                            else:
+                                baked_texture = bpy.data.images.load(full_image_path)
                             node_texture.image = baked_texture
+                            baked_texture.reload()
                             print(f"Successfully auto-loaded: {clean_img_name}")
+                            replaced_count += 1
                         except Exception as e:
                             print(f"Error loading image {clean_img_name}: {e}")
-                    else:
-                        # Fails gracefully without breaking the rest of your material setup script
-                        print(f"Skipped loading: {clean_img_name} not found in blend folder.")
+
                 else:
                     print("Could not auto-load texture: Blend file must be saved to determine folder path.")
                 
                 links.new(node_uvmap.outputs['UV'], node_texture.inputs['Vector'])
                 links.new(node_texture.outputs['Color'], node_principled.inputs['Base Color'])
+                links.new(node_texture.outputs['Alpha'], node_principled.inputs['Alpha'])
                 links.new(node_principled.outputs['BSDF'], node_output.inputs['Surface'])
 
                 obj.data.materials.append(new_mat)
         
-        self.report({'INFO'}, f"I think I replaced as many textres as I could find...")
+        self.report({'INFO'}, f"Replaced materials in {replaced_count} objects...")
         return {'FINISHED'}
+        
+# ====================================================================
+# Replace selected materials with baked materials where applicable
+# ====================================================================
+class OOTP_replace_selected_materials(bpy.types.Operator):
+    """Replace selected materials with baked materials, where applicable"""
+    bl_idname = "ootp.replace_selected_materials"
+    bl_label = "Replace selected materials with baked textures"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    def execute(self, context):
+        
+        mesh_objects = [obj for obj in context.selected_objects if "nobake" not in obj.name.lower() and obj.type == 'MESH']
+        mesh_objects = sorted(mesh_objects, key=lambda obj: obj.name.lower())
+        
+        replaced_count = 0
+    
+        for obj in mesh_objects:
+            if "nobake" in obj.name.lower():
+                continue
+            
+            if obj.type == 'MESH':
+                obj_name = obj.name
+                mat_name = obj_name[2:] if obj_name.startswith("C-") else obj_name
+                
+                obj.data.materials.clear()
+        
+                new_mat = bpy.data.materials.new(name=mat_name)
+                new_mat.use_nodes = True
+                nodes = new_mat.node_tree.nodes
+                links = new_mat.node_tree.links
+                
+                nodes.clear()
+
+                node_output  = nodes.new(type='ShaderNodeOutputMaterial')
+                node_principled = nodes.new(type='ShaderNodeBsdfPrincipled')
+                node_texture = nodes.new(type='ShaderNodeTexImage')
+                node_uvmap   = nodes.new(type='ShaderNodeUVMap')
+                
+                node_uvmap.location = (-600, 0)
+                node_texture.location = (-300, 0)
+                node_principled.location = (0, 0)
+                node_output.location = (300, 0)
+                
+                active_uv = obj.data.uv_layers.active
+                if active_uv:
+                    node_uvmap.uv_map = active_uv.name
+
+                clean_img_name = f"{mat_name.replace(' ', '_')}_day.png"
+                
+                if bpy.data.is_saved:
+                    absolute_blend_path = bpy.path.abspath(bpy.data.filepath)
+                    blend_dir = os.path.dirname(absolute_blend_path)
+                    full_image_path = os.path.join(blend_dir, clean_img_name)
+                    
+                    if os.path.exists(full_image_path):
+                        try:
+                            if clean_img_name in bpy.data.images:
+                                baked_texture = bpy.data.images[clean_img_name]
+                                
+                                if baked_texture.packed_file:
+                                    baked_texture.unpack(method='USE_LOCAL')
+                                baked_texture.filepath = full_image_path
+                            else:
+                                baked_texture = bpy.data.images.load(full_image_path)
+                            node_texture.image = baked_texture
+                            baked_texture.reload()
+                            print(f"Successfully auto-loaded: {clean_img_name}")
+                            replaced_count += 1
+                        except Exception as e:
+                            print(f"Error loading image {clean_img_name}: {e}")
+
+                else:
+                    print("Could not auto-load texture: Blend file must be saved to determine folder path.")
+                
+                links.new(node_uvmap.outputs['UV'], node_texture.inputs['Vector'])
+                links.new(node_texture.outputs['Color'], node_principled.inputs['Base Color'])
+                links.new(node_texture.outputs['Alpha'], node_principled.inputs['Alpha'])
+                links.new(node_principled.outputs['BSDF'], node_output.inputs['Surface'])
+
+                obj.data.materials.append(new_mat)
+        
+        self.report({'INFO'}, f"Replaced materials in {replaced_count} objects...")
+        return {'FINISHED'}
+        
         
 # ====================================================================
 # OOTP OBJ export with crowd replacements
 # ====================================================================        
 class WM_OT_ootp_ballpark_exporter(bpy.types.Operator, ExportHelper):
-    """Export OBJ for OOTP and automatically swap out crowd material blocks in the MTL file"""
+    """Export OBJ for OOTP, reorganize texture files into [Model Name]_Textures, and patch MTL references"""
+
     bl_idname = "wm.export_ootp_ballpark"
     bl_label = "Export OOTP Ballpark (.obj)"
-    
+
     filename_ext = ".obj"
-    filter_glob: bpy.props.StringProperty(default="*.obj", options={'HIDDEN'})
+    filter_glob: bpy.props.StringProperty(default="*.obj", options={"HIDDEN"})
 
     def execute(self, context):
         obj_filepath = self.filepath
         export_dir = os.path.dirname(obj_filepath)
         mtl_filepath = obj_filepath.replace(".obj", ".mtl")
-        
+
+        # ---------------------------------------------------------------------
+        # DETERMINE DYNAMIC TEXTURE FOLDER & BLEND DIRECTORY
+        # ---------------------------------------------------------------------
+        blend_filepath = bpy.data.filepath
+        if blend_filepath:
+            blend_dir = os.path.dirname(blend_filepath)
+            model_name = os.path.splitext(os.path.basename(blend_filepath))[0]
+            texture_folder_name = f"{model_name}_Textures"
+        else:
+            blend_dir = export_dir
+            texture_folder_name = "Textures"
+
+        textures_dir = os.path.join(export_dir, texture_folder_name)
+
+        # ---------------------------------------------------------------------
+        # STEP 1: UNPACK AND SAVE IMAGES FROM NOBAKE MESHES
+        # ---------------------------------------------------------------------
         for obj in context.scene.objects:
-            if "nobake" in obj.name.lower() and obj.type == 'MESH':
+            if "nobake" in obj.name.lower() and obj.type == "MESH":
                 for slot in obj.material_slots:
                     if slot.material and slot.material.use_nodes:
                         for node in slot.material.node_tree.nodes:
-                            # Find image texture nodes
-                            if node.type == 'TEX_IMAGE' and node.image:
+                            if node.type == "TEX_IMAGE" and node.image:
                                 img = node.image
-                                # Determine the target path inside the export folder
-                                target_img_path = os.path.join(export_dir, os.path.basename(img.filepath))
-                                
-                                # If the image is packed inside Blender, unpack it directly to our folder
+                                target_img_path = os.path.join(
+                                    export_dir, os.path.basename(img.filepath)
+                                )
+
                                 if img.packed_file:
-                                    img.unpack(method='WRITE_LOCAL')
-                                # If it's a virtual/cached path, save a real copy out to disk
+                                    img.unpack(method="WRITE_LOCAL")
                                 else:
                                     try:
                                         img.save_render(target_img_path)
                                     except Exception:
-                                        # Fallback if save_render fails
                                         pass
-        
+
+        # ---------------------------------------------------------------------
+        # STEP 2: FLUSH GENERATED / DIRTY BAKE CANVASES TO DISK
+        # ---------------------------------------------------------------------
         for img in bpy.data.images:
-            if img.is_dirty and img.packed_file is None:  # If it's a newly baked/unsaved image
-                # Save it temporarily to your blend file directory so it has a path
-                base_path = bpy.path.abspath("//")
-                if base_path:
-                    img.filepath_raw = os.path.join(base_path, img.name)
-                    img.save()
-            
+            if img.is_dirty or img.source == "GENERATED":
+                filename = (
+                    img.name
+                    if img.name.lower().endswith((".png", ".webp"))
+                    else f"{img.name}.png"
+                )
+                full_save_path = os.path.join(export_dir, filename)
+                try:
+                    img.save_render(full_save_path, scene=context.scene)
+                    img.filepath = full_save_path
+                    img.filepath_raw = full_save_path
+                    print(
+                        f"Successfully flushed bake canvas to disk: {full_save_path}"
+                    )
+                except Exception as e:
+                    print(f"Could not save image {img.name}: {e}")
+
+        # ---------------------------------------------------------------------
+        # STEP 3: EXECUTE NATIVE OBJ EXPORT
+        # ---------------------------------------------------------------------
         bpy.ops.wm.obj_export(
             filepath=obj_filepath,
-            export_selected_objects=False,   
+            export_selected_objects=False,
             export_animation=False,
-            export_materials=True,           
-            export_pbr_extensions=False,     # Standard format for OOTP compatibility
-            path_mode='COPY',                # Now it will successfully find and copy the files!
-            forward_axis='NEGATIVE_Z',       
-            up_axis='Y',
-            export_triangulated_mesh=True    
+            export_materials=True,
+            export_pbr_extensions=False,
+            path_mode="COPY",
+            forward_axis="NEGATIVE_Z",
+            up_axis="Y",
+            export_triangulated_mesh=True,
         )
-        
+
+        # ---------------------------------------------------------------------
+        # STEP 4: PROCESS MTL FILE (REPLACE ATTENDANCE & MOVE TEXTURES)
+        # ---------------------------------------------------------------------
         if os.path.exists(mtl_filepath):
             try:
-                with open(mtl_filepath, 'r', encoding='utf-8') as f:
+                with open(mtl_filepath, "r", encoding="utf-8") as f:
                     mtl_content = f.read()
 
+                # --- PART A: CROWD / ATTENDANCE BLOCK REPLACEMENTS ---
                 replacements = [
-                    # --- BLUE ---
+                    # BLUE
                     {
                         "pattern": r"newmtl seating_attendance4_blue\b.*?(?=\n\n|\Z)",
-                        "replacement": "newmtl seating_attendance4_blue\nKa 0.000000 0.000000 0.000000\nKd 0.380392 0.384314 0.364706\nKs 0.000000 0.000000 0.000000\nNi 1.000000\nd 1.000000\nillum 1\nmap_Kd ../../attendance/seating_popularity4_blue.jpg"
+                        "replacement": (
+                            "newmtl seating_attendance4_blue\nKa 0.000000"
+                            " 0.000000 0.000000\nKd 0.380392 0.384314"
+                            " 0.364706\nKs 0.000000 0.000000 0.000000\nNi"
+                            " 1.000000\nd 1.000000\nillum 1\nmap_Kd"
+                            " ../../attendance/seating_popularity4_blue.jpg"
+                        ),
                     },
                     {
                         "pattern": r"newmtl seating_attendance3_blue\b.*?(?=\n\n|\Z)",
-                        "replacement": "newmtl seating_attendance3_blue\nKa 0.000000 0.000000 0.000000\nKd 0.364706 0.376471 0.352941\nKs 0.000000 0.000000 0.000000\nNi 1.000000\nd 1.000000\nillum 1\nmap_Kd ../../attendance/seating_popularity3_blue.jpg"
+                        "replacement": (
+                            "newmtl seating_attendance3_blue\nKa 0.000000"
+                            " 0.000000 0.000000\nKd 0.364706 0.376471"
+                            " 0.352941\nKs 0.000000 0.000000 0.000000\nNi"
+                            " 1.000000\nd 1.000000\nillum 1\nmap_Kd"
+                            " ../../attendance/seating_popularity3_blue.jpg"
+                        ),
                     },
                     {
                         "pattern": r"newmtl seating_attendance2_blue\b.*?(?=\n\n|\Z)",
-                        "replacement": "newmtl seating_attendance2_blue\nKa 0.000000 0.000000 0.000000\nKd 0.345098 0.380392 0.415686\nKs 0.000000 0.000000 0.000000\nNi 1.000000\nd 1.000000\nillum 1\nmap_Kd ../../attendance/seating_popularity2_blue.jpg"
+                        "replacement": (
+                            "newmtl seating_attendance2_blue\nKa 0.000000"
+                            " 0.000000 0.000000\nKd 0.345098 0.380392"
+                            " 0.415686\nKs 0.000000 0.000000 0.000000\nNi"
+                            " 1.000000\nd 1.000000\nillum 1\nmap_Kd"
+                            " ../../attendance/seating_popularity2_blue.jpg"
+                        ),
                     },
                     {
                         "pattern": r"newmtl seating_attendance1_blue\b.*?(?=\n\n|\Z)",
-                        "replacement": "newmtl seating_attendance1_blue\nKa 0.000000 0.000000 0.000000\nKd 0.309804 0.360784 0.419608\nKs 0.000000 0.000000 0.000000\nNi 1.000000\nd 1.000000\nillum 1\nmap_Kd ../../attendance/seating_popularity1_blue.jpg"
+                        "replacement": (
+                            "newmtl seating_attendance1_blue\nKa 0.000000"
+                            " 0.000000 0.000000\nKd 0.309804 0.360784"
+                            " 0.419608\nKs 0.000000 0.000000 0.000000\nNi"
+                            " 1.000000\nd 1.000000\nillum 1\nmap_Kd"
+                            " ../../attendance/seating_popularity1_blue.jpg"
+                        ),
                     },
-                    
-                    # --- RED ---
+                    # RED
                     {
                         "pattern": r"newmtl seating_attendance4_red\b.*?(?=\n\n|\Z)",
-                        "replacement": "newmtl seating_attendance4_red\nKa 0.000000 0.000000 0.000000\nKd 0.380392 0.384314 0.364706\nKs 0.000000 0.000000 0.000000\nNi 1.000000\nd 1.000000\nillum 1\nmap_Kd ../../attendance/seating_popularity4_red.jpg"
+                        "replacement": (
+                            "newmtl seating_attendance4_red\nKa 0.000000"
+                            " 0.000000 0.000000\nKd 0.380392 0.384314"
+                            " 0.364706\nKs 0.000000 0.000000 0.000000\nNi"
+                            " 1.000000\nd 1.000000\nillum 1\nmap_Kd"
+                            " ../../attendance/seating_popularity4_red.jpg"
+                        ),
                     },
                     {
                         "pattern": r"newmtl seating_attendance3_red\b.*?(?=\n\n|\Z)",
-                        "replacement": "newmtl seating_attendance3_red\nKa 0.000000 0.000000 0.000000\nKd 0.364706 0.376471 0.352941\nKs 0.000000 0.000000 0.000000\nNi 1.000000\nd 1.000000\nillum 1\nmap_Kd ../../attendance/seating_popularity3_red.jpg"
+                        "replacement": (
+                            "newmtl seating_attendance3_red\nKa 0.000000"
+                            " 0.000000 0.000000\nKd 0.364706 0.376471"
+                            " 0.352941\nKs 0.000000 0.000000 0.000000\nNi"
+                            " 1.000000\nd 1.000000\nillum 1\nmap_Kd"
+                            " ../../attendance/seating_popularity3_red.jpg"
+                        ),
                     },
                     {
                         "pattern": r"newmtl seating_attendance2_red\b.*?(?=\n\n|\Z)",
-                        "replacement": "newmtl seating_attendance2_red\nKa 0.000000 0.000000 0.000000\nKd 0.345098 0.380392 0.415686\nKs 0.000000 0.000000 0.000000\nNi 1.000000\nd 1.000000\nillum 1\nmap_Kd ../../attendance/seating_popularity2_red.jpg"
+                        "replacement": (
+                            "newmtl seating_attendance2_red\nKa 0.000000"
+                            " 0.000000 0.000000\nKd 0.345098 0.380392"
+                            " 0.415686\nKs 0.000000 0.000000 0.000000\nNi"
+                            " 1.000000\nd 1.000000\nillum 1\nmap_Kd"
+                            " ../../attendance/seating_popularity2_red.jpg"
+                        ),
                     },
                     {
                         "pattern": r"newmtl seating_attendance1_red\b.*?(?=\n\n|\Z)",
-                        "replacement": "newmtl seating_attendance1_red\nKa 0.000000 0.000000 0.000000\nKd 0.309804 0.360784 0.419608\nKs 0.000000 0.000000 0.000000\nNi 1.000000\nd 1.000000\nillum 1\nmap_Kd ../../attendance/seating_popularity1_red.jpg"
+                        "replacement": (
+                            "newmtl seating_attendance1_red\nKa 0.000000"
+                            " 0.000000 0.000000\nKd 0.309804 0.360784"
+                            " 0.419608\nKs 0.000000 0.000000 0.000000\nNi"
+                            " 1.000000\nd 1.000000\nillum 1\nmap_Kd"
+                            " ../../attendance/seating_popularity1_red.jpg"
+                        ),
                     },
-
-                    # --- GREY ---
+                    # GREY
                     {
                         "pattern": r"newmtl seating_attendance4_grey\b.*?(?=\n\n|\Z)",
-                        "replacement": "newmtl seating_attendance4_grey\nKa 0.000000 0.000000 0.000000\nKd 0.380392 0.384314 0.364706\nKs 0.000000 0.000000 0.000000\nNi 1.000000\nd 1.000000\nillum 1\nmap_Kd ../../attendance/seating_popularity4_grey.jpg"
+                        "replacement": (
+                            "newmtl seating_attendance4_grey\nKa 0.000000"
+                            " 0.000000 0.000000\nKd 0.380392 0.384314"
+                            " 0.364706\nKs 0.000000 0.000000 0.000000\nNi"
+                            " 1.000000\nd 1.000000\nillum 1\nmap_Kd"
+                            " ../../attendance/seating_popularity4_grey.jpg"
+                        ),
                     },
                     {
                         "pattern": r"newmtl seating_attendance3_grey\b.*?(?=\n\n|\Z)",
-                        "replacement": "newmtl seating_attendance3_grey\nKa 0.000000 0.000000 0.000000\nKd 0.364706 0.376471 0.352941\nKs 0.000000 0.000000 0.000000\nNi 1.000000\nd 1.000000\nillum 1\nmap_Kd ../../attendance/seating_popularity3_grey.jpg"
+                        "replacement": (
+                            "newmtl seating_attendance3_grey\nKa 0.000000"
+                            " 0.000000 0.000000\nKd 0.364706 0.376471"
+                            " 0.352941\nKs 0.000000 0.000000 0.000000\nNi"
+                            " 1.000000\nd 1.000000\nillum 1\nmap_Kd"
+                            " ../../attendance/seating_popularity3_grey.jpg"
+                        ),
                     },
                     {
                         "pattern": r"newmtl seating_attendance2_grey\b.*?(?=\n\n|\Z)",
-                        "replacement": "newmtl seating_attendance2_grey\nKa 0.000000 0.000000 0.000000\nKd 0.345098 0.380392 0.415686\nKs 0.000000 0.000000 0.000000\nNi 1.000000\nd 1.000000\nillum 1\nmap_Kd ../../attendance/seating_popularity2_grey.jpg"
+                        "replacement": (
+                            "newmtl seating_attendance2_grey\nKa 0.000000"
+                            " 0.000000 0.000000\nKd 0.345098 0.380392"
+                            " 0.415686\nKs 0.000000 0.000000 0.000000\nNi"
+                            " 1.000000\nd 1.000000\nillum 1\nmap_Kd"
+                            " ../../attendance/seating_popularity2_grey.jpg"
+                        ),
                     },
                     {
                         "pattern": r"newmtl seating_attendance1_grey\b.*?(?=\n\n|\Z)",
-                        "replacement": "newmtl seating_attendance1_grey\nKa 0.000000 0.000000 0.000000\nKd 0.309804 0.360784 0.419608\nKs 0.000000 0.000000 0.000000\nNi 1.000000\nd 1.000000\nillum 1\nmap_Kd ../../attendance/seating_popularity1_grey.jpg"
+                        "replacement": (
+                            "newmtl seating_attendance1_grey\nKa 0.000000"
+                            " 0.000000 0.000000\nKd 0.309804 0.360784"
+                            " 0.419608\nKs 0.000000 0.000000 0.000000\nNi"
+                            " 1.000000\nd 1.000000\nillum 1\nmap_Kd"
+                            " ../../attendance/seating_popularity1_grey.jpg"
+                        ),
                     },
-
-                    # --- GREEN ---
+                    # GREEN
                     {
                         "pattern": r"newmtl crowd_new_4\b.*?(?=\n\n|\Z)",
-                        "replacement": "newmtl crowd_new_4\nKa 0.000000 0.000000 0.000000\nKd 0.380392 0.384314 0.364706\nKs 0.000000 0.000000 0.000000\nKe 0.000000 0.000000 0.000000\nNi 1.000000\nd 1.000000\nillum 1\nmap_Kd ../../attendance/seating_popularity4.jpg"
+                        "replacement": (
+                            "newmtl crowd_new_4\nKa 0.000000 0.000000"
+                            " 0.000000\nKd 0.380392 0.384314 0.364706\nKs"
+                            " 0.000000 0.000000 0.000000\nKe 0.000000 0.000000"
+                            " 0.000000\nNi 1.000000\nd 1.000000\nillum"
+                            " 1\nmap_Kd"
+                            " ../../attendance/seating_popularity4.jpg"
+                        ),
                     },
                     {
                         "pattern": r"newmtl Crowd_new_3\b.*?(?=\n\n|\Z)",
-                        "replacement": "newmtl Crowd_new_3\nKa 0.000000 0.000000 0.000000\nKd 0.364706 0.376471 0.352941\nKs 0.000000 0.000000 0.000000\nKe 0.000000 0.000000 0.000000\nNi 1.000000\nd 1.000000\nillum 1\nmap_Kd ../../attendance/seating_popularity3.jpg"
+                        "replacement": (
+                            "newmtl Crowd_new_3\nKa 0.000000 0.000000"
+                            " 0.000000\nKd 0.364706 0.376471 0.352941\nKs"
+                            " 0.000000 0.000000 0.000000\nKe 0.000000 0.000000"
+                            " 0.000000\nNi 1.000000\nd 1.000000\nillum"
+                            " 1\nmap_Kd"
+                            " ../../attendance/seating_popularity3.jpg"
+                        ),
                     },
                     {
                         "pattern": r"newmtl crowd_new_2\b.*?(?=\n\n|\Z)",
-                        "replacement": "newmtl crowd_new_2\nKa 0.000000 0.000000 0.000000\nKd 0.321569 0.360784 0.309804\nKs 0.000000 0.000000 0.000000\nKe 0.000000 0.000000 0.000000\nNi 1.000000\nd 1.000000\nillum 1\nmap_Kd ../../attendance/seating_popularity2.jpg"
+                        "replacement": (
+                            "newmtl crowd_new_2\nKa 0.000000 0.000000"
+                            " 0.000000\nKd 0.321569 0.360784 0.309804\nKs"
+                            " 0.000000 0.000000 0.000000\nKe 0.000000 0.000000"
+                            " 0.000000\nNi 1.000000\nd 1.000000\nillum"
+                            " 1\nmap_Kd"
+                            " ../../attendance/seating_popularity2.jpg"
+                        ),
                     },
                     {
                         "pattern": r"newmtl crowd_new_1\b.*?(?=\n\n|\Z)",
-                        "replacement": "newmtl crowd_new_1\nKa 0.000000 0.000000 0.000000\nKd 0.286275 0.349020 0.274510\nKs 0.000000 0.000000 0.000000\nKe 0.000000 0.000000 0.000000\nNi 1.000000\nd 1.000000\nillum 1\nmap_Kd ../../attendance/seating_popularity1.jpg"
-                    }
+                        "replacement": (
+                            "newmtl crowd_new_1\nKa 0.000000 0.000000"
+                            " 0.000000\nKd 0.286275 0.349020 0.274510\nKs"
+                            " 0.000000 0.000000 0.000000\nKe 0.000000 0.000000"
+                            " 0.000000\nNi 1.000000\nd 1.000000\nillum"
+                            " 1\nmap_Kd"
+                            " ../../attendance/seating_popularity1.jpg"
+                        ),
+                    },
                 ]
 
                 patch_count = 0
                 for item in replacements:
                     if re.search(item["pattern"], mtl_content, flags=re.DOTALL):
-                        mtl_content = re.sub(item["pattern"], item["replacement"], mtl_content, flags=re.DOTALL)
+                        mtl_content = re.sub(
+                            item["pattern"],
+                            item["replacement"],
+                            mtl_content,
+                            flags=re.DOTALL,
+                        )
                         patch_count += 1
 
-                with open(mtl_filepath, 'w', encoding='utf-8') as f:
-                    f.write(mtl_content)
-                    
-                self.report({'INFO'}, f"Export complete. Successfully patched {patch_count} active definitions.")
-                
-            except Exception as e:
-                self.report({'ERROR'}, f"Failed parsing MTL textures: {str(e)}")
-        else:
-            self.report({'WARNING'}, "OBJ Exported, but no tracking MTL found to override.")
+                # --- PART B: MOVE TEXTURES & EDIT MAP_KD REFERENCES ---
+                def process_and_move(match):
+                    prefix = match.group(1)  # map_Kd or map_d
+                    filename = match.group(2)  # e.g., Quartz_Light_Grey1_day.png
 
-        return {'FINISHED'}
+                    night_filename = filename.replace("_day", "_night")
+
+                    source_file = os.path.join(export_dir, filename)
+                    dest_file = os.path.join(textures_dir, filename)
+
+                    if not os.path.exists(textures_dir):
+                        os.makedirs(textures_dir)
+
+                    # Move main texture (clobbering if exists)
+                    if os.path.isfile(source_file):
+                        if os.path.exists(dest_file):
+                            os.remove(dest_file)
+                        shutil.move(source_file, dest_file)
+
+                    # Check for and move corresponding _night texture if present
+                    if night_filename != filename:
+                        source_night = os.path.join(blend_dir, night_filename)
+                        if not os.path.isfile(source_night):
+                            source_night = os.path.join(export_dir, night_filename)
+
+                        dest_night = os.path.join(textures_dir, night_filename)
+
+                        if os.path.isfile(source_night):
+                            if os.path.exists(dest_night):
+                                os.remove(dest_night)
+                            shutil.move(source_night, dest_night)
+
+                    return f"{prefix} {texture_folder_name}/{filename}"
+
+                # Match lines like 'map_Kd my_image.png' that aren't already prefixed with a directory
+                texture_pattern = r"^(map_K?d)\s+(?!(?:\.\.|[^/\n]+/))([^\r\n]*)"
+                mtl_content = re.sub(
+                    texture_pattern,
+                    process_and_move,
+                    mtl_content,
+                    flags=re.MULTILINE,
+                )
+
+                # Save the modified MTL file
+                with open(mtl_filepath, "w", encoding="utf-8") as f:
+                    f.write(mtl_content)
+
+                # ---------------------------------------------------------------------
+                # STEP 5: CLEANUP ORPHANED ATTENDANCE / CROWD TEXTURES IN EXPORT DIR
+                # ---------------------------------------------------------------------
+                for file_name in os.listdir(export_dir):
+                    lower_name = file_name.lower()
+                    if lower_name.startswith(("seating_attendance", "crowd_new")):
+                        orphaned_path = os.path.join(export_dir, file_name)
+                        if os.path.isfile(orphaned_path):
+                            try:
+                                os.remove(orphaned_path)
+                            except Exception:
+                                pass
+
+                self.report(
+                    {"INFO"},
+                    f"Export complete. Patched {patch_count} attendance materials, reorganized to '{texture_folder_name}', and cleaned up unused textures.",
+                )
+
+            except Exception as e:
+                self.report(
+                    {"ERROR"}, f"Failed parsing MTL textures: {str(e)}"
+                )
+        else:
+            self.report(
+                {"WARNING"}, "OBJ Exported, but no tracking MTL found to override."
+            )
+
+        return {"FINISHED"}
 
 # ====================================================================
 # Bake all components that aren't tagged "nobake"
@@ -792,7 +1167,6 @@ class OOTP_OT_batch_bake_day(bpy.types.Operator):
     bl_label = "OOTP Batch Bake"
     bl_options = {'REGISTER', 'UNDO'}
     
-    # This creates the user input field in the Blender popup dialog box
     max_samples: bpy.props.IntProperty(
         name="Max Cycles Samples",
         description="Set the sample count for the high-quality bake pass",
@@ -819,11 +1193,8 @@ class OOTP_OT_batch_bake_day(bpy.types.Operator):
         
         start_time = time.time()
         
-        # 1. Ensure we are using Cycles and set the user-defined sample rate
         context.scene.render.engine = 'CYCLES'
         context.scene.cycles.samples = self.max_samples
-        
-        # Ensure Diffuse bake options only focus on flat Color (no direct/indirect lighting)
         context.scene.render.bake.use_pass_direct = True
         context.scene.render.bake.use_pass_indirect = True
         context.scene.render.bake.use_pass_color = True
@@ -832,14 +1203,12 @@ class OOTP_OT_batch_bake_day(bpy.types.Operator):
         
         ensure_system_console_open()
         
-        # Determine the export directory based on your current blend file location
         if not bpy.data.is_saved:
             self.report({'ERROR'}, "Please save your Blend file first so the script knows where to drop the textures!")
             return {'CANCELLED'}
             
         model_dir = os.path.dirname(bpy.data.filepath)
         
-        # Force Object Mode
         if bpy.ops.object.mode_set.poll():
             bpy.ops.object.mode_set(mode='OBJECT')
             
@@ -855,20 +1224,17 @@ class OOTP_OT_batch_bake_day(bpy.types.Operator):
         
         mesh_objects = sorted(mesh_objects, key=lambda obj: obj.name.lower())
         
-        # 2. Loop through all components in the scene
-        for obj in mesh_objects:
+        for idx, obj in enumerate(mesh_objects, start=1):
             
             if "nobake" in obj.name.lower() or obj.hide_viewport or obj.hide_render:
-                print(f"Skipping {obj.name}: Object is excluded, hidden or disabled for baking.")
+                print(f"({idx}/{len(mesh_objects)}) Skipping {obj.name}: Object is excluded, hidden or disabled for baking.")
                 continue
                 
             if obj.type == 'MESH':
-                # Isolate selection to the single object so Cycles focuses the bake
                 bpy.ops.object.select_all(action='DESELECT')
                 obj.select_set(True)
                 context.view_layer.objects.active = obj
                 
-                # Double check that our target image node exists and is active
                 target_image = None
                 for slot in obj.material_slots:
                     if slot.material and slot.material.use_nodes:
@@ -880,16 +1246,16 @@ class OOTP_OT_batch_bake_day(bpy.types.Operator):
                                     slot.material.node_tree.nodes.active = node
                 
                 if not target_image:
-                    print(f"Skipping {obj.name}: No active 'Bake Target' image node found.")
+                    print(f"({idx}/{len(mesh_objects)}) Skipping {obj.name}: No active 'Bake Target' image node found.")
                     continue
                     
-                print(f"Baking {obj.name} at {self.max_samples} samples...")
+                print(f"({idx}/{len(mesh_objects)}) Baking {obj.name} at {self.max_samples} samples...")
                 
-                # 3. Trigger the Cycles Texture Bake
                 bpy.ops.object.bake(type='DIFFUSE', save_mode='INTERNAL')
                 
-                # 4. Save and rename the resulting image map asset
-                new_filename = target_image.name.replace("_bake", suffix) + ".png"
+                base_name, _ = os.path.splitext(target_image.name)
+                modified_base = base_name.replace("_day", suffix)
+                new_filename = f"{modified_base}.png"
                 save_path = os.path.join(model_dir, new_filename)
                 
                 target_image.filepath_raw = save_path
@@ -906,9 +1272,680 @@ class OOTP_OT_batch_bake_day(bpy.types.Operator):
         
         time_string = f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s"
         
-        self.report({'INFO'}, f"Successfully baked and saved {baked_count} day texture maps in {time_string}")
+        self.report({'INFO'}, f"Successfully baked and saved {baked_count} texture maps in {time_string}")
         return {'FINISHED'}
         
+# ====================================================================
+# Test bake all components that aren't tagged "nobake"
+# ==================================================================== 
+class OOTP_OT_test_batch_bake_day(bpy.types.Operator):
+    """Bakes all valid and prepared components and as _day bakes and applies them automatically for checking"""
+    bl_idname = "ootp.test_batch_bake"
+    bl_label = "OOTP Test Batch Bake"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+
+    def execute(self, context):
+        
+        start_time = time.time()
+        
+        context.scene.render.engine = 'CYCLES'
+        context.scene.cycles.samples = 1
+        context.scene.render.bake.use_pass_direct = True
+        context.scene.render.bake.use_pass_indirect = True
+        context.scene.render.bake.use_pass_color = True
+        
+        suffix = "_day"
+        
+        ensure_system_console_open()
+        
+        if not bpy.data.is_saved:
+            self.report({'ERROR'}, "Please save your Blend file first so the script knows where to drop the textures!")
+            return {'CANCELLED'}
+            
+        model_dir = os.path.dirname(bpy.data.filepath)
+        
+        if bpy.ops.object.mode_set.poll():
+            bpy.ops.object.mode_set(mode='OBJECT')
+            
+        baked_count = 0
+        
+        mesh_objects = [
+            obj for obj in context.scene.objects 
+            if obj.type == 'MESH' 
+            and "nobake" not in obj.name.lower() 
+            and not obj.hide_viewport 
+            and not obj.hide_render
+        ]
+        
+        mesh_objects = sorted(mesh_objects, key=lambda obj: obj.name.lower())
+        
+        for idx, obj in enumerate(mesh_objects, start=1):
+            
+            if "nobake" in obj.name.lower() or obj.hide_viewport or obj.hide_render:
+                print(f"({idx}/{len(mesh_objects)}) Skipping {obj.name}: Object is excluded, hidden or disabled for baking.")
+                continue
+                
+            if obj.type == 'MESH':
+                bpy.ops.object.select_all(action='DESELECT')
+                obj.select_set(True)
+                context.view_layer.objects.active = obj
+                
+                target_image = None
+                for slot in obj.material_slots:
+                    if slot.material and slot.material.use_nodes:
+                        for node in slot.material.node_tree.nodes:
+                            if node.type == 'TEXT_IMAGE' or (node.type == 'TEX_IMAGE' and node.label == "Bake Target"):
+                                if node.image:
+                                    target_image = node.image
+                                    node.select = True
+                                    slot.material.node_tree.nodes.active = node
+                
+                if not target_image:
+                    print(f"({idx}/{len(mesh_objects)}) Skipping {obj.name}: No active 'Bake Target' image node found.")
+                    continue
+                    
+                print(f"({idx}/{len(mesh_objects)}) Baking {obj.name} at 1 sample...")
+                
+                bpy.ops.object.bake(type='DIFFUSE', save_mode='INTERNAL')
+                
+                base_name, _ = os.path.splitext(target_image.name)
+                modified_base = base_name.replace("_day", suffix)
+                new_filename = f"{modified_base}.png"
+                save_path = os.path.join(model_dir, new_filename)
+                
+                target_image.filepath_raw = save_path
+                target_image.file_format = 'PNG'
+                target_image.save()
+                
+                print(f"  -> Successfully saved: {save_path}")
+                baked_count += 1
+         
+        
+        elapsed_seconds = time.time() - start_time
+        minutes = int(elapsed_seconds // 60)
+        seconds = int(elapsed_seconds % 60)
+        
+        time_string = f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s"
+        
+        # run the replace materials script automatically
+        bpy.ops.ootp.replace_all_materials()
+        
+        self.report({'INFO'}, f"Successfully baked and saved {baked_count} texture maps in {time_string}")
+        return {'FINISHED'}  
+
+# ====================================================================
+# Test bake selected components that aren't tagged "nobake"
+# ==================================================================== 
+class OOTP_OT_test_selected_bake_day(bpy.types.Operator):
+    """Bakes all valid and prepared selected components and as _day bakes and applies them automatically for checking"""
+    bl_idname = "ootp.test_selected_bake"
+    bl_label = "OOTP Selected Batch Bake"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+
+    def execute(self, context):
+        
+        start_time = time.time()
+        
+        context.scene.render.engine = 'CYCLES'
+        context.scene.cycles.samples = 1
+        context.scene.render.bake.use_pass_direct = True
+        context.scene.render.bake.use_pass_indirect = True
+        context.scene.render.bake.use_pass_color = True
+        
+        suffix = "_day"
+        
+        ensure_system_console_open()
+        
+        if not bpy.data.is_saved:
+            self.report({'ERROR'}, "Please save your Blend file first so the script knows where to drop the textures!")
+            return {'CANCELLED'}
+            
+        model_dir = os.path.dirname(bpy.data.filepath)
+        
+        if bpy.ops.object.mode_set.poll():
+            bpy.ops.object.mode_set(mode='OBJECT')
+            
+        baked_count = 0
+        
+        mesh_objects = [
+            obj for obj in context.selected_objects 
+            if obj.type == 'MESH' 
+            and "nobake" not in obj.name.lower() 
+            and not obj.hide_viewport 
+            and not obj.hide_render
+        ]
+        
+        mesh_objects = sorted(mesh_objects, key=lambda obj: obj.name.lower())
+        
+        for idx, obj in enumerate(mesh_objects, start=1):
+            
+            if "nobake" in obj.name.lower() or obj.hide_viewport or obj.hide_render:
+                print(f"({idx}/{len(mesh_objects)}) Skipping {obj.name}: Object is excluded, hidden or disabled for baking.")
+                continue
+                
+            if obj.type == 'MESH':
+                bpy.ops.object.select_all(action='DESELECT')
+                obj.select_set(True)
+                context.view_layer.objects.active = obj
+                
+                target_image = None
+                for slot in obj.material_slots:
+                    if slot.material and slot.material.use_nodes:
+                        for node in slot.material.node_tree.nodes:
+                            if node.type == 'TEXT_IMAGE' or (node.type == 'TEX_IMAGE' and node.label == "Bake Target"):
+                                if node.image:
+                                    target_image = node.image
+                                    node.select = True
+                                    slot.material.node_tree.nodes.active = node
+                
+                if not target_image:
+                    print(f"({idx}/{len(mesh_objects)}) Skipping {obj.name}: No active 'Bake Target' image node found.")
+                    continue
+                    
+                print(f"({idx}/{len(mesh_objects)}) Baking {obj.name} at 1 sample...")
+                
+                bpy.ops.object.bake(type='DIFFUSE', save_mode='INTERNAL')
+                
+                base_name, _ = os.path.splitext(target_image.name)
+                modified_base = base_name.replace("_day", suffix)
+                new_filename = f"{modified_base}.png"
+                save_path = os.path.join(model_dir, new_filename)
+                
+                target_image.filepath_raw = save_path
+                target_image.file_format = 'PNG'
+                target_image.save()
+                
+                print(f"  -> Successfully saved: {save_path}")
+                baked_count += 1
+         
+        
+        elapsed_seconds = time.time() - start_time
+        minutes = int(elapsed_seconds // 60)
+        seconds = int(elapsed_seconds % 60)
+        
+        time_string = f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s"
+        
+        # run the replace materials script automatically
+        bpy.ops.ootp.replace_selected_materials()
+        
+        self.report({'INFO'}, f"Successfully baked and saved {baked_count} texture maps in {time_string}")
+        return {'FINISHED'}          
+
+# ====================================================================
+# Bake selected components that aren't tagged "nobake"
+# ==================================================================== 
+class OOTP_OT_selected_batch_bake_day(bpy.types.Operator):
+    """Bakes all valid and selected components and saves them as either _day or _night bakes."""
+    bl_idname = "ootp.selected_batch_bake"
+    bl_label = "OOTP Selected Batch Bake"
+    bl_options = {'REGISTER', 'UNDO'}
+    
+    max_samples: bpy.props.IntProperty(
+        name="Max Cycles Samples",
+        description="Set the sample count for the high-quality bake pass",
+        default=128,
+        min=1,
+        max=4096
+    )
+    
+    bake_time: bpy.props.EnumProperty(
+        name="Lighting Setup",
+        description="Choose the suffix for your final exported texture maps",
+        items=[
+            ('DAY', "Day Pass (_day)", "Bake full diffuse daylight illumination"),
+            ('NIGHT', "Night Pass (_night)", "Bake full diffuse nighttime stadium lighting")
+        ],
+        default='DAY'
+    )
+
+    def invoke(self, context, event):
+        # This forces Blender to pop up a dialog box asking for the properties
+        return context.window_manager.invoke_props_dialog(self)
+
+    def execute(self, context):
+        
+        start_time = time.time()
+        
+        context.scene.render.engine = 'CYCLES'
+        context.scene.cycles.samples = self.max_samples
+        context.scene.render.bake.use_pass_direct = True
+        context.scene.render.bake.use_pass_indirect = True
+        context.scene.render.bake.use_pass_color = True
+        
+        suffix = "_day" if self.bake_time == 'DAY' else "_night"
+        
+        ensure_system_console_open()
+        
+        if not bpy.data.is_saved:
+            self.report({'ERROR'}, "Please save your Blend file first so the script knows where to drop the textures!")
+            return {'CANCELLED'}
+            
+        model_dir = os.path.dirname(bpy.data.filepath)
+        
+        if bpy.ops.object.mode_set.poll():
+            bpy.ops.object.mode_set(mode='OBJECT')
+            
+        baked_count = 0
+        
+        mesh_objects = [
+            obj for obj in context.selected_objects 
+            if obj.type == 'MESH' 
+            and "nobake" not in obj.name.lower() 
+            and not obj.hide_viewport 
+            and not obj.hide_render
+        ]
+        
+        mesh_objects = sorted(mesh_objects, key=lambda obj: obj.name.lower())
+        
+        for idx, obj in enumerate(mesh_objects, start=1):
+            
+            if "nobake" in obj.name.lower() or obj.hide_viewport or obj.hide_render:
+                print(f"({idx}/{len(mesh_objects)}) Skipping {obj.name}: Object is excluded, hidden or disabled for baking.")
+                continue
+                
+            if obj.type == 'MESH':
+                bpy.ops.object.select_all(action='DESELECT')
+                obj.select_set(True)
+                context.view_layer.objects.active = obj
+                
+                target_image = None
+                for slot in obj.material_slots:
+                    if slot.material and slot.material.use_nodes:
+                        for node in slot.material.node_tree.nodes:
+                            if node.type == 'TEXT_IMAGE' or (node.type == 'TEX_IMAGE' and node.label == "Bake Target"):
+                                if node.image:
+                                    target_image = node.image
+                                    node.select = True
+                                    slot.material.node_tree.nodes.active = node
+                
+                if not target_image:
+                    print(f"({idx}/{len(mesh_objects)}) Skipping {obj.name}: No active 'Bake Target' image node found.")
+                    continue
+                    
+                print(f"({idx}/{len(mesh_objects)}) Baking {obj.name} at {self.max_samples} samples...")
+                
+                bpy.ops.object.bake(type='DIFFUSE', save_mode='INTERNAL')
+                
+                base_name, _ = os.path.splitext(target_image.name)
+                modified_base = base_name.replace("_day", suffix)
+                new_filename = f"{modified_base}.png"
+                save_path = os.path.join(model_dir, new_filename)
+                
+                target_image.filepath_raw = save_path
+                target_image.file_format = 'PNG'
+                target_image.save()
+                
+                print(f"  -> Successfully saved: {save_path}")
+                baked_count += 1
+         
+        
+        elapsed_seconds = time.time() - start_time
+        minutes = int(elapsed_seconds // 60)
+        seconds = int(elapsed_seconds % 60)
+        
+        time_string = f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s"
+        
+        self.report({'INFO'}, f"Successfully baked and saved {baked_count} texture maps in {time_string}")
+        return {'FINISHED'}
+        
+# ====================================================================
+# Shadow-only selected components that aren't tagged "nobake"
+# ==================================================================== 
+class OOTP_OT_selected_batch_shadow_bake_day(bpy.types.Operator):
+    """Bakes all valid and selected components and saves them as either _day or _night bakes."""
+    bl_idname = "ootp.selected_shadow_batch_bake"
+    bl_label = "OOTP Selected Shadow Batch Bake"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        
+        start_time = time.time()
+        
+        context.scene.render.engine = 'CYCLES'
+        context.scene.cycles.samples = 256
+        context.scene.render.bake.use_pass_direct = True
+        context.scene.render.bake.use_pass_indirect = True
+        context.scene.render.bake.use_pass_color = False
+        
+        suffix = "_shadow"
+        
+        ensure_system_console_open()
+        
+        if not bpy.data.is_saved:
+            self.report({'ERROR'}, "Please save your Blend file first so the script knows where to drop the textures!")
+            return {'CANCELLED'}
+            
+        model_dir = os.path.dirname(bpy.data.filepath)
+        
+        if bpy.ops.object.mode_set.poll():
+            bpy.ops.object.mode_set(mode='OBJECT')
+            
+        baked_count = 0
+        
+        mesh_objects = [
+            obj for obj in context.selected_objects 
+            if obj.type == 'MESH' 
+            and "nobake" not in obj.name.lower() 
+            and not obj.hide_viewport 
+            and not obj.hide_render
+        ]
+        
+        mesh_objects = sorted(mesh_objects, key=lambda obj: obj.name.lower())
+        
+        for idx, obj in enumerate(mesh_objects, start=1):
+            
+            if "nobake" in obj.name.lower() or obj.hide_viewport or obj.hide_render:
+                print(f"({idx}/{len(mesh_objects)}) Skipping {obj.name}: Object is excluded, hidden or disabled for baking.")
+                continue
+                
+            if obj.type == 'MESH':
+                bpy.ops.object.select_all(action='DESELECT')
+                obj.select_set(True)
+                context.view_layer.objects.active = obj
+                
+                target_image = None
+                for slot in obj.material_slots:
+                    if slot.material and slot.material.use_nodes:
+                        for node in slot.material.node_tree.nodes:
+                            if node.type == 'TEXT_IMAGE' or (node.type == 'TEX_IMAGE' and node.label == "Bake Target"):
+                                if node.image:
+                                    target_image = node.image
+                                    node.select = True
+                                    slot.material.node_tree.nodes.active = node
+                
+                if not target_image:
+                    print(f"({idx}/{len(mesh_objects)}) Skipping {obj.name}: No active 'Bake Target' image node found.")
+                    continue
+                    
+                print(f"({idx}/{len(mesh_objects)}) Baking {obj.name} at 256 samples...")
+                
+                bpy.ops.object.bake(type='DIFFUSE', save_mode='INTERNAL')
+                
+                base_name, _ = os.path.splitext(target_image.name)
+                modified_base = base_name.replace("_day", suffix)
+                new_filename = f"{modified_base}.png"
+                save_path = os.path.join(model_dir, new_filename)
+                
+                target_image.filepath_raw = save_path
+                target_image.file_format = 'PNG'
+                target_image.save()
+                
+                print(f"  -> Successfully saved: {save_path}")
+                baked_count += 1
+         
+        
+        elapsed_seconds = time.time() - start_time
+        minutes = int(elapsed_seconds // 60)
+        seconds = int(elapsed_seconds % 60)
+        
+        time_string = f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s"
+        
+        self.report({'INFO'}, f"Successfully baked and saved {baked_count} texture maps in {time_string}")
+        return {'FINISHED'}
+        
+# ====================================================================
+# Color-only selected components that aren't tagged "nobake"
+# ==================================================================== 
+class OOTP_OT_selected_batch_color_bake_day(bpy.types.Operator):
+    """Bakes all valid and selected components and saves them as either _day or _night bakes."""
+    bl_idname = "ootp.selected_color_batch_bake"
+    bl_label = "OOTP Selected Color Batch Bake"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        
+        start_time = time.time()
+        
+        context.scene.render.engine = 'CYCLES'
+        context.scene.cycles.samples = 1
+        context.scene.render.bake.use_pass_direct = False
+        context.scene.render.bake.use_pass_indirect = False
+        context.scene.render.bake.use_pass_color = True
+        
+        suffix = "_color"
+        
+        ensure_system_console_open()
+        
+        if not bpy.data.is_saved:
+            self.report({'ERROR'}, "Please save your Blend file first so the script knows where to drop the textures!")
+            return {'CANCELLED'}
+            
+        model_dir = os.path.dirname(bpy.data.filepath)
+        
+        if bpy.ops.object.mode_set.poll():
+            bpy.ops.object.mode_set(mode='OBJECT')
+            
+        baked_count = 0
+        
+        mesh_objects = [
+            obj for obj in context.selected_objects 
+            if obj.type == 'MESH' 
+            and "nobake" not in obj.name.lower() 
+            and not obj.hide_viewport 
+            and not obj.hide_render
+        ]
+        
+        mesh_objects = sorted(mesh_objects, key=lambda obj: obj.name.lower())
+        
+        for idx, obj in enumerate(mesh_objects, start=1):
+            
+            if "nobake" in obj.name.lower() or obj.hide_viewport or obj.hide_render:
+                print(f"({idx}/{len(mesh_objects)}) Skipping {obj.name}: Object is excluded, hidden or disabled for baking.")
+                continue
+                
+            if obj.type == 'MESH':
+                bpy.ops.object.select_all(action='DESELECT')
+                obj.select_set(True)
+                context.view_layer.objects.active = obj
+                
+                target_image = None
+                for slot in obj.material_slots:
+                    if slot.material and slot.material.use_nodes:
+                        for node in slot.material.node_tree.nodes:
+                            if node.type == 'TEXT_IMAGE' or (node.type == 'TEX_IMAGE' and node.label == "Bake Target"):
+                                if node.image:
+                                    target_image = node.image
+                                    node.select = True
+                                    slot.material.node_tree.nodes.active = node
+                
+                if not target_image:
+                    print(f"({idx}/{len(mesh_objects)}) Skipping {obj.name}: No active 'Bake Target' image node found.")
+                    continue
+                    
+                print(f"({idx}/{len(mesh_objects)}) Baking {obj.name} at 1 sample...")
+                
+                bpy.ops.object.bake(type='DIFFUSE', save_mode='INTERNAL')
+                
+                base_name, _ = os.path.splitext(target_image.name)
+                modified_base = base_name.replace("_day", suffix)
+                new_filename = f"{modified_base}.png"
+                save_path = os.path.join(model_dir, new_filename)
+                
+                target_image.filepath_raw = save_path
+                target_image.file_format = 'PNG'
+                target_image.save()
+                
+                print(f"  -> Successfully saved: {save_path}")
+                baked_count += 1
+         
+        
+        elapsed_seconds = time.time() - start_time
+        minutes = int(elapsed_seconds // 60)
+        seconds = int(elapsed_seconds % 60)
+        
+        time_string = f"{minutes}m {seconds}s" if minutes > 0 else f"{seconds}s"
+        
+        self.report({'INFO'}, f"Successfully baked and saved {baked_count} texture maps in {time_string}")
+        return {'FINISHED'}        
+  
+# ====================================================================
+# Open config json file for editing
+# ==================================================================== 
+
+class OOTP_open_config(bpy.types.Operator):
+    """Open the custom defaults JSON file in your default text editor"""
+    bl_idname = "ootp.open_config"
+    bl_label = "Edit Add-on Defaults File"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        # Ensure the file exists before opening it
+        if not os.path.exists(CONFIG_FILE_PATH):
+            load_user_defaults()
+            
+        # Blender's native cross-platform tool to open files/folders externally
+        bpy.ops.wm.url_open(url=CONFIG_FILE_PATH)
+        
+        self.report({'INFO'}, f"Opened config file: {os.path.basename(CONFIG_FILE_PATH)}")
+        return {'FINISHED'}
+
+# ====================================================================
+# Reload preferences
+# ==================================================================== 
+
+class OOTP_reload_config(bpy.types.Operator):
+    """Reload settings from the defaults JSON file without restarting Blender"""
+    bl_idname = "ootp.reload_config"
+    bl_label = "Reload Add-on Settings"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        global USER_SETTINGS
+        
+        # Re-run your loading function to refresh the global cache
+        USER_SETTINGS = load_user_defaults()
+        
+        # Push a visual notification toast to the bottom right of Blender's UI
+        self.report({'INFO'}, "Add-on settings reloaded successfully!")
+        return {'FINISHED'}
+
+def get_matching_value(name, data_dict, default=0.0):
+    """
+    Checks for exact match (for saved state), 
+    then checks if name starts with any key (for JSON defaults).
+    """
+    # 1. Exact match (for your saved night_emitter_map)
+    if name in data_dict:
+        return data_dict[name]
+    
+    # 2. "Starts with" match (for your JSON configuration)
+    # Sorting by length (longest first) ensures 'floodlight_tower' 
+    # is checked before 'floodlight'
+    sorted_keys = sorted(data_dict.keys(), key=len, reverse=True)
+    
+    for key in sorted_keys:
+        if name.startswith(key):
+            return data_dict[key]
+            
+    return default
+    
+class OOTP_day_night_toggle(bpy.types.Operator):
+    bl_idname = "ootp.day_night_toggle"
+    bl_label = "Switch Between Day and Night Lighting"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        world = context.scene.world
+        scene = context.scene
+        if not world or not world.node_tree: return {'CANCELLED'}
+        
+        nodes = world.node_tree.nodes
+        node_sky = next((n for n in nodes if n.type == 'TEX_SKY'), None)
+        node_bg = next((n for n in nodes if n.type == 'BACKGROUND'), None)
+        
+        sky_defaults = USER_SETTINGS.get("sky_texture_defaults", {})
+        emission_defaults = USER_SETTINGS.get("material_emission_defaults", {})
+        
+        if not node_sky:
+            set_default_sky_texture(world)
+            return {'FINISHED'}
+        
+        is_night = node_sky.sun_intensity < 0.05 if node_sky else True
+
+        if not is_night:
+            # --- GOING TO NIGHT ---
+            # 1. Save Day Sky Settings
+            scene["day_settings"] = {
+                "sun_intensity": node_sky.sun_intensity,
+                "sun_elevation": node_sky.sun_elevation,
+                "sun_rotation": node_sky.sun_rotation,
+                "strength": node_bg.inputs['Strength'].default_value
+            }
+            
+            # 2. Apply Night Lighting
+            node_sky.sun_intensity = 0.0
+            node_sky.sun_elevation = math.radians(0)
+            node_sky.sun_rotation = math.radians(90)
+            node_bg.inputs['Strength'].default_value = 0.1
+            
+            # 3. Restore Night Emitters (Use stored map, or fallback to JSON defaults)
+            raw_data = scene.get("night_emitter_map", "{}")
+
+            # 2. Convert the string back into a real Python dictionary
+            try:
+                stored_emitters = json.loads(raw_data)
+            except (json.JSONDecodeError, TypeError):
+                stored_emitters = {}
+
+            # Check if currently Day
+            is_night = node_sky.sun_intensity < 0.05
+            for mat in bpy.data.materials:
+                if not mat.node_tree: continue
+                
+                principled = next((n for n in mat.node_tree.nodes if n.type == 'BSDF_PRINCIPLED'), None)
+                if principled and 'Emission Strength' in principled.inputs:
+                    
+                    # 1. Try to find the value in the saved map (partial match supported)
+                    val = get_matching_value(mat.name, stored_emitters, default=None)
+                    
+                    # 2. If not in the map, fallback to the JSON defaults (partial match supported)
+                    if val is None:
+                        val = get_matching_value(mat.name, emission_defaults, default=0.0)
+                        
+                    principled.inputs['Emission Strength'].default_value = val
+                    
+            for obj in bpy.data.objects:
+                if obj.type == 'LIGHT' and obj.data.type == 'AREA':
+                    obj.hide_set(False)
+                    obj.hide_render = False
+                            
+            print("Switched to Night. Emitters restored from memory/defaults.")
+
+        else:
+            # --- GOING TO DAY ---
+            # 1. Save Current Night Emitter states before turning them off
+            emitter_map = {}
+            for mat in bpy.data.materials:
+                if mat.node_tree:
+                    p = next((n for n in mat.node_tree.nodes if n.type == 'BSDF_PRINCIPLED'), None)
+                    if p and 'Emission Strength' in p.inputs:
+                        emitter_map[mat.name] = p.inputs['Emission Strength'].default_value
+            scene["night_emitter_map"] = json.dumps(emitter_map) # Persists to .blend file
+            
+            # 2. Restore Day Sky
+            day = scene.get("day_settings", sky_defaults)
+            node_sky.sun_intensity = day.get('sun_intensity', sky_defaults.get('sun_intensity'))
+            node_sky.sun_elevation = day.get('sun_elevation', math.radians(sky_defaults.get('sun_elevation')))
+            node_sky.sun_rotation = day.get('sun_rotation', math.radians(sky_defaults.get('sun_rotation')))
+            node_bg.inputs['Strength'].default_value = day.get('strength', sky_defaults.get('strength'))
+            
+            # 3. Turn off Emitters
+            for mat in bpy.data.materials:
+                if mat.node_tree:
+                    p = next((n for n in mat.node_tree.nodes if n.type == 'BSDF_PRINCIPLED'), None)
+                    if p and 'Emission Strength' in p.inputs:
+                        p.inputs['Emission Strength'].default_value = 0.0
+            print("Switched to Day. Emitter states cached.")
+            
+            for obj in bpy.data.objects:
+                if obj.type == 'LIGHT' and obj.data.type == 'AREA':
+                    obj.hide_set(True)
+                    obj.hide_render = True
+
+        return {'FINISHED'}
+   
 # ====================================================================
 # UI MENU
 # ====================================================================
@@ -927,10 +1964,21 @@ class VIEW3D_MT_ootp_custom_menu(bpy.types.Menu):
         layout.operator("ootp.selected_unwrap", text="Unwrap Selected Objects", icon='STICKY_UVS_LOC')
         layout.separator()
         layout.operator("ootp.batch_bake", text="Bake All Bakeable Components", icon='RENDER_STILL')
+        layout.operator("ootp.selected_batch_bake", text="Bake Selected Components", icon='RENDER_STILL')
+        layout.operator("ootp.test_batch_bake", text="Test Bake & Replace All Bakeable Components", icon='RENDER_STILL')
+        layout.operator("ootp.test_selected_bake", text="Test Bake & Replace Selected Components", icon='RENDER_STILL')
+        layout.separator()
+        layout.operator("ootp.selected_shadow_batch_bake", text="Bake Selected Component Shadows", icon='RENDER_STILL')
+        layout.operator("ootp.selected_color_batch_bake", text="Bake Selected Component Colors", icon='RENDER_STILL')
         layout.separator()
         layout.operator("ootp.replace_all_materials", text="Replace all materials with baked textures", icon='MATERIAL')
+        layout.operator("ootp.replace_selected_materials", text="Replace selected materials with baked textures", icon='MATERIAL')
+        layout.operator("ootp.day_night_toggle", text="Toggle between Day & Night Lighting", icon='LIGHT_SUN')
         layout.separator()
         layout.operator("wm.export_ootp_ballpark", text="Export Ballpark to OOTP", icon='EXPORT')
+        layout.separator()
+        layout.operator("ootp.open_config", text="Open config file", icon='CURRENT_FILE')
+        layout.operator("ootp.reload_config", text="Reload preferences from config file", icon='LOOP_BACK')
 
 
 def draw_menu_header(self, context):
@@ -939,28 +1987,71 @@ def draw_menu_header(self, context):
         layout.menu("VIEW3D_MT_ootp_custom_menu")
 
 def register():
+    global USER_SETTINGS
+    USER_SETTINGS = load_user_defaults()
     bpy.utils.register_class(OOTP_OT_scene_cleaner)
     bpy.utils.register_class(OOTP_selected_scene_cleaner)
     bpy.utils.register_class(OOTP_OT_node_cloner)
     bpy.utils.register_class(OOTP_UV_unwrap_global)
     bpy.utils.register_class(OOTP_UV_unwrap_selected)
     bpy.utils.register_class(OOTP_replace_all_materials)
+    bpy.utils.register_class(OOTP_replace_selected_materials)
     bpy.utils.register_class(WM_OT_ootp_ballpark_exporter)
     bpy.utils.register_class(OOTP_OT_batch_bake_day)
+    bpy.utils.register_class(OOTP_OT_test_batch_bake_day)
+    bpy.utils.register_class(OOTP_OT_test_selected_bake_day)
+    bpy.utils.register_class(OOTP_OT_selected_batch_bake_day)
+    bpy.utils.register_class(OOTP_OT_selected_batch_shadow_bake_day)
+    bpy.utils.register_class(OOTP_OT_selected_batch_color_bake_day)
+    bpy.utils.register_class(OOTP_open_config)
+    bpy.utils.register_class(OOTP_reload_config)
+    bpy.utils.register_class(OOTP_day_night_toggle)
     bpy.utils.register_class(VIEW3D_MT_ootp_custom_menu)
     bpy.types.VIEW3D_MT_editor_menus.append(draw_menu_header)
+    
+    wm = bpy.context.window_manager
+    kc = wm.keyconfigs.addon
+    if kc:
+        # Target 3D Viewport in Object Mode
+        km = kc.keymaps.new(name='3D View', space_type='VIEW_3D')
+        
+        # Call the built-in 'wm.call_menu' operator
+        kmi = km.keymap_items.new(
+            "wm.call_menu", 
+            type='O',
+            value='PRESS', 
+            shift=False,
+            ctrl=False, 
+            alt=True
+        )
+        # Set the target menu name to your OOTP menu's bl_idname
+        kmi.properties.name = "VIEW3D_MT_ootp_custom_menu"
+        
+        addon_keymaps.append((km, kmi))
 
 def unregister():
+    for km, kmi in addon_keymaps:
+        km.keymap_items.remove(kmi)
+    addon_keymaps.clear()
     bpy.types.VIEW3D_MT_editor_menus.remove(draw_menu_header)
     bpy.utils.unregister_class(VIEW3D_MT_ootp_custom_menu)
     bpy.utils.unregister_class(OOTP_OT_batch_bake_day)
+    bpy.utils.unregister_class(OOTP_OT_test_batch_bake_day)
+    bpy.utils.unregister_class(OOTP_OT_test_selected_bake_day)
+    bpy.utils.unregister_class(OOTP_OT_selected_batch_bake_day)
     bpy.utils.unregister_class(WM_OT_ootp_ballpark_exporter)
     bpy.utils.unregister_class(OOTP_replace_all_materials)
+    bpy.utils.unregister_class(OOTP_replace_selected_materials)
     bpy.utils.unregister_class(OOTP_UV_unwrap_global)
     bpy.utils.unregister_class(OOTP_UV_unwrap_selected)
     bpy.utils.unregister_class(OOTP_OT_node_cloner)
     bpy.utils.unregister_class(OOTP_selected_scene_cleaner)
     bpy.utils.unregister_class(OOTP_OT_scene_cleaner)
+    bpy.utils.unregister_class(OOTP_open_config)
+    bpy.utils.unregister_class(OOTP_reload_config)
+    bpy.utils.unregister_class(OOTP_day_night_toggle)
+    bpy.utils.umregister_class(OOTP_OT_selected_batch_shadow_bake_day)
+    bpy.utils.umregister_class(OOTP_OT_selected_batch_color_bake_day)
 
 if __name__ == "__main__":
     register()
