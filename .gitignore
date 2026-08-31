@@ -1,2 +1,5 @@
 # SketchUp Backup Files
 *.skb
+
+# PowerShell Scripts
+*.ps1
