@@ -1518,9 +1518,8 @@ class WM_OT_ootp_ballpark_exporter_webp(bpy.types.Operator, ExportHelper):
 
                             # Open and convert directly to WebP
                             with Image.open(source_night) as img:
-                                # quality=80 gives great compression while maintaining visual transparency & detail
                                 # Set lossless=True if you need pixel-perfect accuracy
-                                img.save(dest_night, "WEBP", quality=80, lossless=False)
+                                img.save(dest_night, "WEBP", quality=95, lossless=False)
 
                     return f"{prefix} {texture_folder_name}/{filename}"
 
