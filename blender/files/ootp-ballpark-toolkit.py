@@ -1521,6 +1521,7 @@ class WM_OT_ootp_ballpark_exporter_webp(bpy.types.Operator, ExportHelper):
                                 # Set lossless=True if you need pixel-perfect accuracy
                                 img.save(dest_night, "WEBP", quality=95, lossless=False)
 
+
                     return f"{prefix} {texture_folder_name}/{filename}"
 
                 # Match lines like 'map_Kd my_image.png' that aren't already prefixed with a directory
