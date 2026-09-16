@@ -589,7 +589,7 @@
 
     <p>Back in Blender, go into the Materials tab and highlight the material you want to use as the emitter.  You can figure out which material you need to mask by going into Edit mode and selecting one of the faces you want to apply the mask to.  From there, you can go back into Object mode if you wish.</p>
 
-    <p>In the Shader Editor, add another Image Texture, and link the UV Map you're linking to the bake target to the UV node on the new image.  Click on the "Open" button in that texture node and open your mask.</p>
+    <p>In the Shader Editor, add another Image Texture, and link the UV Map you're linking to the bake target to the UV node on the new image.  That will ensure the mask will line up with the bake target. Then click on the "Open" button in that new texture node and open your mask.</p>
 
     <p>Add a "Math" node (Utilities &rarr; Math &rarr; Math) and set the dropdown to "Multiply."</p>
 
