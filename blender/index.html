@@ -36,6 +36,7 @@
   <a href="#section13">Exporting the OBJ file</a>
   <a href="#section11">Setting Up Night Lighting</a>
   <a href="#section12">Night Texture Baking</a>
+  <a href="#section15">Advanced Lighting with Masks</a>
   <a href="#section8">Troubleshooting / FAQ</a>
   <a href="#section9">Resources & Files</a>
 </div>
@@ -44,9 +45,9 @@
     <div class="header">How To Use Blender To Bake Textures For OOTP</div>
     <h1 id="section1">Setting Up Your SketchUp Model</h1>
     <p>If you've done any 3D Modeling for OOTP before, you're probably familiar withe the idea that faces in SketchUp have two sides - front and back, which are shown as white and gray, respectively.  In order to properly bake textures with Blender, make sure that <i>every</i> face is showing the front.  So when in Monochrome view mode, every face should appear white:</p>
-    <img src=".\images\sketchup_white.jpg" class="blender-image">
+    <img src=".\images\sketchup_white.webp" class="blender-image">
     <p>Additionally, you'll want to compartmentalize the model as much as possible by enclosing things inside named components.  Each component will be baked separately, so the more components you have, the more detail you'll be able to get.  <i>Do not nest components.</i>  You can have multiple instances of the same component, but I find that adds unnecessary complexity to the baking process for minimal gain.  <i><b>The exception to this is stadium lighting.</b></i>  While it's irrelevant for the "daytime" bake, it works better for the way Blender handles light emission for each light source to be its own component.  It will add steps to the baking process, but it's not terrible.</p>
-    <img src=".\images\sketchup_components.jpg" class="blender-image">
+    <img src=".\images\sketchup_components.webp" class="blender-image">
     <p>There are some components that I recommend leaving out of the baking process - think of things like LED ribbons, backlit advertisements, and other things that will not really be affected much by ambient lighting.  I suggest putting those into components with a "nobake" suffix, so "advertisementsnobake" or "led_ribbonnobake", etc.  That being said you <i>can</i> bake those if you wish.  If you decide to do so, the baking process is a tiny bit different for those, and I'll detail the differences later on.</p>
     <p>Additionally, there are going to be two things that you will <i>always</i> want to avoid baking - crowds and "live" scoreboards.  Since those can be replaced by OOTP, baking them is not only unnecessary but actually causes problems for the game engine.  You can tag them with the same "nobake" suffix to help keep things organized, or whatever else works for you.</p>
 
@@ -56,8 +57,8 @@
 
     <p>In Blender, go to Edit &rarr; Preferences &rarr; Add-ons, click the little down arrow at the top right of the window, and choose “Install from Disk.”  Navigate to the folder you downloaded the importer to and double-click the .zip file to install it.  Once it is installed you will see it in the list of add-ons.  Make sure the little checkbox is checked to enable it.</p>
 
-    <img src=".\images\blender_ext_1.jpg" class="blender-image">
-    <img src=".\images\blender_ext_2.jpg" class="blender-image">
+    <img src=".\images\blender_ext_1.webp" class="blender-image">
+    <img src=".\images\blender_ext_2.webp" class="blender-image">
 
     <p>Note that I've only used this to import models created with SketchUp 2017 Make, though it should work with newer versions of SketchUp as well.</p>
 
@@ -75,7 +76,7 @@
 
     <br>
     <img border=0 width=624 height=335
-    src=".\images\image061.jpg"></p>
+    src=".\images\image061.webp"></p>
 
     <p>In this view, the UV Editor is to the left, the 3D Viewport is to the
     right of that, and the Shader Editor is below the 3D Viewport, but you can arrange them as you wish.  You will also
@@ -90,7 +91,7 @@
     the default Camera, Cube, and Light objects.  You'll see them at the top of the
     Outliner panel under “Scene Collection &rarr; Collection”:<br>
     <br>
-    <img border=0 src=".\images\image062.jpg"><br>
+    <img border=0 src=".\images\image062.webp"><br>
     <br>
     Just click on each of those in the panel and Delete them.  They are not
     necessary.</p>
@@ -99,7 +100,7 @@
 
     <p>You may also want to hide any components that you do not want to affect the bake.  When I model a park in SketchUp I usually include a "skyline" texture, which is really just a big gentle arc with a skyline or treeline image to provide a semi-realistic backdrop, but we don't want that to mess with the bake because it won't cast realistic shadows.  In the Outliner, you'll notice that each component has two icons - an eye, and a camera.  The eye simply toggles the visibility, and the camera controls whether the object is included in the export or render.  For our purposes, you'll want to make sure that <i>both</i> are toggled off for anything you don't want to affect the bake.</p>
 
-    <img src=".\images\image100.jpg">
+    <img src=".\images\image100.webp">
 
     <p>When you export the model at the end of the process, you can make those objects visible again if you wish.</p>
 
@@ -116,36 +117,36 @@
     left of the pane and press the Z key and choose “Rendered” from the popup. 
     That will give you a quick real-time view of what the lit model looks like.  <br>
     <br>
-    <img src=".\images\image004.jpg"><br><br>
+    <img src=".\images\image004.webp"><br><br>
     <img border=0 width=624 height=348
-    src=".\images\image005.jpg"><br>
+    src=".\images\image005.webp"><br>
     <br>
     Without a sun (or any light source) it's awfully dark, so let's shine some
     light on it.<br>
     <br>
     <img border=0 width=624 height=362
-    src=".\images\image063.jpg"><br>
+    src=".\images\image063.webp"><br>
     <br>
     In the Properties panel, click the “World” tab – it's the small red globe
     icon.  Click the yellow dot next to “Color” and choose “Sky Texture” from the
     menu.<br>
     <br>
     <img border=0 width=624 height=287
-    src=".\images\image064.jpg"><br>
+    src=".\images\image064.webp"><br>
     <br>
     The World tab will now show some settings you can choose.  I find the “Multiple
     Scattering” setting works best (older versions of Blender may call it
     “Nishita”).  As you can see, the default settings are pretty severe:<br>
     <br>
     <img border=0 width=624 height=352
-    src=".\images\image065.jpg">
+    src=".\images\image065.webp">
 </p>
 
     <p>I find a sweet spot at setting both the Sun Intensity and Strength down to about 0.200.  Play around with the various strength and positioning settings until you like
     what you see:<br>
     <br>
     <img border=0 width=624 height=348
-    src=".\images\image066.jpg"></p>
+    src=".\images\image066.webp"></p>
 
     <p>To make things easier on your computer once you're happy
     with the lighting, you can go back to “Material Preview” from that “Z” menu in
@@ -163,13 +164,13 @@
     highlighted in orange in the 3D Viewport:<br>
     <br>
     <img border=0 width=624 height=248
-    src=".\images\image067.jpg"><br>
+    src=".\images\image067.webp"><br>
     <br>
     You'll also see that the UV Editor has changed and, as promised, it's a mess with textures overlapping each other, so we have to
     properly unwrap the component.<br>
     <br>
     <img border=0 width=497 height=558
-    src=".\images\image016.jpg"></p>
+    src=".\images\image016.webp"></p>
 
     <p>In the Properties panel, click the “Data” tab (the inverted
     green triangle icon) and expand the “UV Maps” section.  You'll see a UVMap
@@ -183,7 +184,7 @@
     the original map and highlight the new map like so:<br>
     <br>
     <img border=0 width=369 height=233
-    src=".\images\image017.jpg"></p>
+    src=".\images\image017.webp"></p>
 
     <p>This will prevent Blender from messing around with any
     texture scaling or orientation you have done in SketchUp. <b>This is important!</b><br>
@@ -194,7 +195,7 @@
     Viewport and UV Editor. </p>
 
     <p><img border=0 width=624 height=279
-    src=".\images\image068.jpg"></p>
+    src=".\images\image068.webp"></p>
 
     <p>From the Face menu in the 3D Viewport, choose “Triangles to
     Quads”, which will help limit the number of faces we're dealing with.</p>
@@ -216,17 +217,17 @@
     “Smart UV Project” from the menu:<br>
     <br>
     <img border=0 width=367 height=459
-    src=".\images\image069.jpg"><br>
+    src=".\images\image069.webp"><br>
     <br>
     Set the Island Margin to <i>at least</i> 0.010 (I usually go with 0.020) and click Unwrap.  <br>
     <br>
     <img border=0 width=345 height=290
-    src=".\images\image022.jpg"></p>
+    src=".\images\image022.webp"></p>
 
     <p>Hey, presto, the UV Map has changed!<br>
     <br>
     <img border=0 width=624 height=644
-    src=".\images\image070.jpg"></p>
+    src=".\images\image070.webp"></p>
 
     <p>If you're satisfied with the unwrapping, cool!  If not you can mark or clear seams from the Edge menu and just re-do the Smart UV project.</p>
     <p>The next step is telling
@@ -247,7 +248,7 @@
     around it being there if you're not comfortable deleting it.<br>
     <br>
     <img border=0 width=359 height=519
-    src=".\images\image025.jpg"><br>
+    src=".\images\image025.webp"><br>
     <br>
     Now we're going to get into the Shader Editor.  A quick note about the Shader
     Editor – navigating it is weird.  There are things that it makes kind of hard
@@ -259,19 +260,19 @@
     Click the first material in the list of materials over in the Properties pane:<br>
     <br>
     <img border=0 width=369 height=287
-    src=".\images\image026.jpg"></p>
+    src=".\images\image026.webp"></p>
 
     <p>You'll notice that the Shader Editor is now looking
     specifically at that material:<br>
     <br>
     <img border=0 width=624 height=309
-    src=".\images\image071.jpg"></p>
+    src=".\images\image071.webp"></p>
 
     <p>First we have to give it a “Source” UV map.  Press Shift-A
     and go to Input &rarr; UV Map<br>
     <br>
     <img border=0 width=384 height=484
-    src=".\images\image029.jpg"><br>
+    src=".\images\image029.webp"><br>
     <br>
     Click the little icon in the left and choose the “original” UV Map.  This is <i>not
     </i>the one you added, but the one we left the camera icon active on before. 
@@ -279,7 +280,7 @@
     “Vector” dot in the materials image box:<br>
     <br>
     <img border=0 width=390 height=301
-    src=".\images\image030.jpg"><br>
+    src=".\images\image030.webp"><br>
     <br>
     Now we're going to add a second UV Map.  Same process to add it as before, but
     we're going to assign the <i>new </i>UV Map we created earlier.  Don't link it
@@ -289,20 +290,20 @@
     bake's target image.<br>
     <br>
     <img border=0 width=423 height=436
-    src=".\images\image031.jpg"><br>
+    src=".\images\image031.webp"><br>
     <br>
     From the little menu icon thing, click it and it will bring up a list of every
     image the model knows about.  You can scroll until you find the target you
     want, or just start typing “field_day” to find it.<br>
     <br>
     <img border=0 width=309 height=309
-    src=".\images\image032.jpg"></p>
+    src=".\images\image032.webp"></p>
 
     <p>Then link the UV from the <i>second</i> UV Map we added to
     the Vector of the bake target.<br>
     <br>
     <img border=0 width=410 height=283
-    src=".\images\image033.jpg"></p>
+    src=".\images\image033.webp"></p>
 
     <p>The next thing to do is simply click the bake target so that
     it has a white border.  <b>This is critical</b> since if you don't highlight
@@ -310,7 +311,7 @@
     Shader Editor will look like this:<br>
     <br>
     <img border=0 width=624 height=231
-    src=".\images\image072.jpg"><br>
+    src=".\images\image072.webp"><br>
     <br>
     Now you repeat the process for every other material in the component.  On the
     bright side, you can speed this up by shift-clicking each of the 3 things we
@@ -319,7 +320,7 @@
     notification that you've copied 3 nodes down at the bottom of the window:<br>
     <br>
     <img border=0 width=317 height=113
-    src=".\images\image036.jpg"><br>
+    src=".\images\image036.webp"><br>
     <br>
     Back over in the Materials list, click the next material.  Notice that the
     Shader Editor looks like it did when we originally clicked the first material,
@@ -338,7 +339,7 @@
     “Principled BSDF” box.<br>
     <br>
     <img border=0 width=624 height=340
-    src=".\images\image037.jpg"><br>
+    src=".\images\image037.webp"><br>
     <br>
     We are now almost ready to bake!<br>
     <br>
@@ -351,13 +352,13 @@
     something low.  Something like 1 or 4.<br>
     <br>
     <img border=0 width=343 height=423
-    src=".\images\image038.jpg"><br>
+    src=".\images\image038.webp"><br>
     <br>
     Scroll down and you'll see a Bake section.  Expand that and set the Bake Type
     to Diffuse and leave all three of the Contributions under “Influence” checked.<br>
     <br>
     <img border=0 width=309 height=303
-    src=".\images\image039.jpg"><br>
+    src=".\images\image039.webp"><br>
     <br>
     Then…click “Bake”!<br>
     <br>
@@ -365,17 +366,17 @@
     confirmation that the Baking map has been saved to an internal image.<br>
     <br>
     <img border=0 width=360 height=87 id="Picture 2"
-    src=".\images\image040.jpg"></p>
+    src=".\images\image040.webp"></p>
 
     <p><br>
     <img border=0 width=468 height=117
-    src=".\images\image041.jpg"><br>
+    src=".\images\image041.webp"><br>
     <br>
     And now over in the UV Editor, you will see the baked texture behind the UV
     grid!<br>
     <br>
     <img border=0 width=624 height=628
-    src=".\images\image073.jpg"><br>
+    src=".\images\image073.webp"><br>
     <br>
     Once you're happy with the rough bake, go back and increase the Max Samples to
     something lie 128 or 256.  The higher the number, the higher quality the bake, 
@@ -389,7 +390,7 @@
     saved in:<br>
     <br>
     <img border=0 width=624 height=375
-    src=".\images\image074.jpg"><br>
+    src=".\images\image074.webp"><br>
     <br>Repeat this process for every component you wish to bake.<br>
     <br>There will probably be elements you don't want to bake shadows into, such as backlight signs, LED ribbons, and so on (again - we completely bypass the crowds and any "live" scoreboard textures since OOTP will handle replacing those on its own).  See the next section on that.<br>
     <br>I would suggest you save your work after each successful bake to make it easier to revert back.
@@ -399,7 +400,7 @@
 
     <ul>
       <li>Set the Bake to Diffuse, but <i>uncheck</i> the "Direct" and "Indirect" checkboxes.  That will cause Blender to bake the texture without any lighting effects.<br><br>
-      <img src=".\images\image096.jpg"></li><br>
+      <img src=".\images\image096.webp"></li><br>
       <li>Set the Max Samples to something really low.  Even setting it to 1 is fine.  Since we're not dealing with any lighting, there's no benefit to slowing the bake down.
       </li>
     </ul>
@@ -428,14 +429,14 @@
     component will just be…gray.<br>
     <br>
     <img border=0 width=624 height=306
-    src=".\images\image075.jpg"><br>
+    src=".\images\image075.webp"><br>
     <br>
     This is actually what we want to see.  Click on the plus button next to the Materials
     list to add a new material slot, and then click the “New” button below the
     list.<br>
     <br>
     <img border=0 width=459 height=550
-    src=".\images\image076.jpg">
+    src=".\images\image076.webp">
 </p>
 
     <p>Give the new material a distinctive name – in this case, I'm
@@ -445,13 +446,13 @@
     Maps” Section of the Data tab, click the camera icon next to the “new” UV Map.<br>
     <br>
     <img border=0 width=356 height=214
-    src=".\images\image050.jpg"><br>
+    src=".\images\image050.webp"><br>
     <br>
     You will notice that a new pair of boxes appeared inside the Shader Editor when
     you created the new material.<br>
     <br>
     <img border=0 width=624 height=233
-    src=".\images\image077.jpg"></p>
+    src=".\images\image077.webp"></p>
 
     <p>
     What we're going to do here is similar to what we had to do to set up baking.  Add
@@ -467,12 +468,12 @@
     Shader Editor should look like this:<br>
     <br>
     <img border=0 width=624 height=254
-    src=".\images\image078.jpg"><br>
+    src=".\images\image078.webp"><br>
     <br>
     And up in the 3D Viewport, look at that!<br>
     <br>
     <img border=0 width=624 height=322
-    src=".\images\image079.jpg"><br>
+    src=".\images\image079.webp"><br>
     <br>
     Congratulations, you have successfully baked a component and applied the baked
     texture to the model!  Now all you have to do is repeat that process for every component in your model. 😛
@@ -490,19 +491,19 @@
     is important</b>.  After you've set that, click the "Export Wavefront OBJ" button.<br>
     <br>
     <img border=0 width=382 height=637
-    src=".\images\image057.jpg"><br>
+    src=".\images\image057.webp"><br>
     <br>
     If you look in the model's folder, you'll notice we have the .obj, .mtl and
     baked texture file(s) all in the same folder:<br>
     <br>
     <img border=0 width=551 height=251
-    src=".\images\image058.jpg"><br>
+    src=".\images\image058.webp"><br>
     <br>
     And if you load that model into OOTP, you'll see your lovely shadows on the
     field!<br>
     <br>
     <img border=0 width=624 height=442 id="Picture 1"
-    src=".\images\image080.jpg"><br>
+    src=".\images\image080.webp"><br>
 
     <h1 id="section11">Setting Up Night Lighting</h1>
 
@@ -510,37 +511,37 @@
 
     <p>The first thing we have to do is dial down the sunlight so that it's just providing a bare minimum of ambient light - that will prevent any textures that aren't getting stadium lighting from rendering <i>completely</i> black.  In the World tab, set the Sun Intensity down really low - I just set it all the way to 0.  Set the Sun Elevation to 90° and the Strength down to something like 0.02 or 0.03.</p>
 
-    <img src=".\images\image098.jpg">
+    <img src=".\images\image098.webp">
 
     <p>If your 3D Viewport is sent to "Rendered" you'll notice that the light has gone <i>almost</i> entirely away.</p>
 
-    <img src=".\images\image099.jpg">
+    <img src=".\images\image099.webp">
     
     <p></p>The next step is to get the light towers to actually emit light.</p>
 
     <p>In Object mode, select the light source you want to work with and then go into Edit mode.  Make sure you're in "Face Select" mode (press the "3" key) and select the face that has the texture representing the lights:</p>
 
-    <img src=".\images\image088.jpg">
+    <img src=".\images\image088.webp">
 
     <p>There are two different ways to set up lighting for our purposes - one is more generic, one is more granular.</p>
 
     <p>For generic lighting, go back into the Materials tab and select the material that represents the acutal lights. Expand the "Surface" section and then expand the "Emission" section from there.  Make sure the Emission color is set to white (which it should be by default) and then crank up the strength until you're happy with how it looks.  You'll probably need to turn it up a lot.  You can also access those settings in the Shader editor, but it's easier to see in the Properties panel.  <i>Note that this will apply the same lighting emission settings to every instance of that material, which may not be what you actually want.</i></p>
 
-    <img src=".\images\image091.jpg">
+    <img src=".\images\image091.webp">
 
     <p>If you want more granular control over the lighting, you can create a new material slot inside each component to act as an emitter.</p>
 
     <p>In Edit mode, make sure the faces containing the light's texture are selected.  Then, in the Materials tab, add a new material slot by clicking the plus sign next to the list of materials.  Give it a distinctive name such as "floodlights_1".  Then click "Assign" to assign that material to the selected face(s).  When you do that, the face will just become a blank white space which is good enough for our purposes.</p>
 
-    <img src=".\images\image089.jpg">
+    <img src=".\images\image089.webp">
 
     <p>Just like above, set the Emission strength and color to your satisfaction.  But <i>this</i> time it will only affect that selected component.</p>
 
-    <img src=".\images\image090.jpg">
+    <img src=".\images\image090.webp">
 
     <p>When you're done, you should have a nicely lit ballpark.</p>
 
-    <img src=".\images\image092.jpg">
+    <img src=".\images\image092.webp">
 
     <p>One thing to note is that an "emitter" emits light in a 360° sphere, so it's sending light in all directions.  You can contain this light by adding surfaces into your model in SketchUp to act as as a "box" to contain the light.  That should block the light from going in any directions you don't want it to go.  But, honestly, for our purposes that's not entirely necessary.</p>
 
@@ -550,7 +551,7 @@
 
     <p>There is one thing you'll have to pay attention to, and that's shared materials.  SketchUp can reuse the same texture file in multiple components.  So if you use a concrete texture for the concourse and also use it in the scoreboard (like I do in the tutorial model), every time you set up the shader, it will ripple out and affect every other instance of that material.  Blender makes it pretty obvious when there are issues by highlighting them in red:</p>
 
-    <img src=".\images\image097.jpg">
+    <img src=".\images\image097.webp">
 
     <p>And pay attention to the target image - Blender won't highlight that if it's an image it knows about, so make sure those are pointing to the correct target.</p>
 
@@ -558,27 +559,67 @@
 
     <p>The main difference - once you've finished baking and if you like what you see, <b>save the image with the _night name</b>.  As before, Blender does not automatically save the image. So in the UV Editor, just choose "Image &rarr; Save As."</p>
 
-    <img src=".\images\image093.jpg">
+    <img src=".\images\image093.webp">
 
     <p>When you save the image, <i>just be sure to change _day to _night</i> and save it into the same folder you exported the OBJ model into (which I didn't do in this screenshot, but you can always move the image afterwards if you make the same mistake).  This, of course, is consistent with what OOTP expects for determining day and night textures.</p>
 
-    <img src=".\images\image094.jpg">
+    <img src=".\images\image094.webp">
 
     <p>When you're done, you'll have day and night textures ready to go!</p>
 
     <p>As a side note, you can skip re-baking any of the lit components if you chose to bake them earlier.  Since OOTP only loads the night texture if it finds one, just having the day texture works fine.</p>
     
+    <h1 id="section15">Advanced Lighting with Masks</h1>
+    
+    <p>There may be times where you want to add some "accent" lighting to a park.  Think lights along a concourse, or in this case, lights inside a dugout.</p>
+
+    <p>The <i>simplest</i> method is to add faces you want to act as light emitters in SketchUp <i>before</i> you bring the model into Blender, and then simply make those materials into emitters like we did with the light towers earlier.</p>
+
+    <p>But if you have an object that you want to add emission to after the fact, you can accomplish that with a mask.  A mask is, essentially, a black and white image that overlays the UV map.  In this example, I'll be working with this dugout object, which has no dedicated emissive surfaces:</p>
+
+    <img src=".\images\image103.webp">
+
+    <p>Once you have baked the image, you can open up that baked texture in pretty much any image editor - in this example, I will be using GIMP.  Once you determine which face(s) you want to add the emissive mask to, simply add 100% white shapes to a new layer.  For this, I will be adding a series of white "circles" to act as lighting.</p>
+
+    <img src=".\images\image104.webp" width="700">
+
+    <p>Then add another layer underneath the white shapes and fill it with black.  Export that to a PNG file with a distinctive name, like "dugout_mask.png."  The big thing to keep in mind is that the final image should only contain black and white.  The white portions will allow light to pass through, and the black portions will mask off the light - we'll see what that looks like in a moment.</p>
+
+    <img src=".\images\image105.webp" width="700">
+
+    <p>Back in Blender, go into the Materials tab and highlight the material you want to use as the emitter.  You can figure out which material you need to mask by going into Edit mode and selecting one of the faces you want to apply the mask to.  From there, you can go back into Object mode if you wish.</p>
+
+    <p>In the Shader Editor, add another Image Texture, and link the UV Map you're linking to the bake target to the UV node on the new image.  Click on the "Open" button in that texture node and open your mask.</p>
+
+    <p>Add a "Math" node (Utilities &rarr; Math &rarr; Math) and set the dropdown to "Multiply."</p>
+
+    <p>Wire the "Color" output of the mask's node to the first "Value" input on the Math node.</p>
+
+    <p>Set your emission strength as the second Value in the Math node.  Since you're generally going to be dealing with smaller, more localized lighting, you can generally set this a lot lower than you did for the light towers.  That will allow you to add lighting into dark areas without overwhelming the overall stadium lighting.  For this example, I will be setting it to 50.</p>
+
+    <p>Wire the "Value" output of the Math node to the Emission &rarr; Strength node in Principled BSDF.  Set the emitter color in that node if you wish to change it.  In the end, you should have a Shader Node that looks like this:</p>
+
+    <img src=".\images\image106.webp">
+
+    <p>You'll know you have it assigned to the right material and wired properly if the "lights" appear in the Viewport like so:</p>
+
+    <img src=".\images\image107.webp">
+
+    <p>And you can toggle the Viewport to "Rendered" mode to get a preview of what it actually looks like so you can adjust the emission strength and colors as needed.</p>
+
+    <img src=".\images\image108.webp">
+
     <h1 id="section8">Troubleshooting / FAQ</h1>
     <p class="question">As I go through the components, sometimes the materials already seem to have UV Maps and bake images assigned to them and have some things highlighted in red, why?</p>
     <p>Generally that's because it's a material that is used in more than one component (as mentioned earlier), and which you've already come across.  Each material can only have one Shader setting, and it follows the material around every time it's encountered.  The red highlights are because those UV maps & images are not "found" within the context of the component.  All you have to do is just adjust the red highlighted items to match the other materials found in the component and you can bake normally.</p>
     <p class="question">When I bake, some of the textures are baking as completely black, how do I fix that?</p>
     <p>What's happening there is that the faces baking black are still somehow facing the wrong way.  Luckily, it's fixable in Blender.</p>
     <p>In the 3D Viewport, open the "Overlays" menu - it's the one that looks like two overlapping circles - and check the "Face Orentation" checkbox.  Any faces that are backwards will become highlighted in red.  In older versions of Blender, front-facing faces will become tinted in blue, although Blender 5 changed that so that the blue tint is completely transparent.</p>
-    <img src=".\images\image081.jpg" style="height:350px;">&nbsp;<img src=".\images\image082.jpg">
+    <img src=".\images\image081.webp" style="height:350px;">&nbsp;<img src=".\images\image082.webp">
     <p>In Edit mode, press the "3" key to enter "Face Select" mode.  You can also click the small icon that looks like to overlapping rectangles.</p>
-    <img src=".\images\image084.jpg">
+    <img src=".\images\image084.webp">
     <p>Select the faces that are facing the wrong way and choose Mesh &rarr; Normals &rarr; Recalculate Outside, and the selected faces should flip the right way.  If not, there is an explicit "Flip" option in that menu if you need to do anything more detailed.</p>
-    <img src=".\images\image083.jpg">&nbsp;<img src=".\images\image086.jpg" style="height:350px;">&nbsp;<img src=".\images\image085.jpg">
+    <img src=".\images\image083.webp">&nbsp;<img src=".\images\image086.webp" style="height:350px;">&nbsp;<img src=".\images\image085.webp">
     <p>Then try baking again.</p>
 
     <p class="question">During a bake, I get a "circular dependency error" message.</p>
@@ -587,7 +628,7 @@
     <p class="question">During a bake, I got a message saying "No active and selected image texture node found in material "material name" for object "component name".  What does that mean?</p>
     <p>Simply put, that means that the bake target image is not specified for that material.  Go back through the materials list for your component and ensure that the bake target image is selected and highlighted in white.</p>
     <img border=0 width=624 height=231
-    src=".\images\image072.jpg"><br>
+    src=".\images\image072.webp"><br>
 
     <p class="question">After baking a texture, I clearly miscalculated how large the bake target needs to be.  How can I fix that?</p>
     <p>In the UV Editor, just click on Image &rarr; Resize and enter your new desired size.  The image will scale up or down accordingly.  Then simply re-run the bake and it will bake to the new size.</p>
@@ -600,11 +641,11 @@
 
     <p class="question">When doing a night bake, some of the sufaces have a noticeable "noise" or "speckling" in the baked texture.</p>
 
-    <img width=250 src=".\images\image101.jpg">
+    <img width=250 src=".\images\image101.webp">
 
     <p>This occurs because of the large emissive surfaces that are lighting the park.  The light rays are bouncing every which way and can cause this noise during a bake.  It's possible to minimize this by upping the Max Samples, which will slow down your bake time.  You can also lower the "Indirect Light" value underneath "Clamping."  By default it's set to 10.  I generally find that when I get this noise, that 3 is a pretty good spot.  You can find the sweet spot for your given model by starting low (although you generally don't want to set it below 1.5) and keep raising the value and re-baking a test component until you are satisfied.</p>
 
-    <img src=".\images\image102.jpg">
+    <img src=".\images\image102.webp">
 
     <p>If absolutely necessary, you can also uncheck the "Indirect" contribution under Bake, which will shortcut the issue at the cost of a bit less realistic lighting.</p>
 
