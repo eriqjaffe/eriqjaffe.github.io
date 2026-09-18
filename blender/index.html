@@ -37,6 +37,7 @@
   <a href="#section11">Setting Up Night Lighting</a>
   <a href="#section12">Night Texture Baking</a>
   <a href="#section15">Advanced Lighting with Masks</a>
+  <a href="#section16">Advanced Lighting with Lights</a>
   <a href="#section8">Troubleshooting / FAQ</a>
   <a href="#section9">Resources & Files</a>
 </div>
@@ -608,6 +609,70 @@
     <p>And you can toggle the Viewport to "Rendered" mode to get a preview of what it actually looks like so you can adjust the emission strength and colors as needed.</p>
 
     <img src=".\images\image108.webp">
+
+    <h1 id="section16">Advanced Lighting with Lights</h1>
+
+    <h3>Adding a basic fill light</h3>
+
+    <p>Sometimes, the emitters in your stadium make leave areas darker than you'd like them, or you may have areas you want to illuminate where an emitter doesn't make sense.  For that, you can use Lights.</p>
+
+    <p>In object mode, press Shift-A &rarr; Light.  There are four options here.  For this tutorial I will be demonstrating an Area light, but the others (except the "Sun") work largely the same.</p>
+
+    <ul>
+      <li><b>Point</b> - this kind of behaves like an emitter, where light is thrown in a 360 degree sphere from a single point in space, except that it is not tied to face.</li>
+      <li><b>Sun</b> - this is pretty much exactly what it sounds like.  It's kind of redundant for our purposes since we're already using a Sky Texture.</li>
+      <li><b>Spot</b> - as you may have guessed, this is a spotlight designed to aim a relatively narrow beam of light.</li>
+      <li><b>Area</b> - Think of this as "constrained" point - it emits directional light from a defined 2D surface (like a square or ellipse) but does no radiate the light out in all directions.</li>
+    </ul>
+
+    <p>When you add an Area light, you will notice an "Area" gets added at the X/Y/Z intersection (right about at home plate), and it will be listed in the Outliner</p>
+
+    <p>The next thing you will want to do is add a target for the light to point at.  We will use an "empty" object.  Shift-A &rarr; Empty &rarr; Plain Axes.  That adds an empty object with a set of coordinates attached to it.  Like the light, it generates at the X/Y/Z intersection and appears in the Outliner as well.  It's a good idea to rename the light and axes to match by double-clicking on their names in the Outliner.  Since the Outliner is alphabeitical, this will help keep them near each other in a more complicated model.</p>
+
+    <img src=".\images\image109.webp">
+
+    <p>To ensure that the light will always point to the target, we need to add a a tracking constraint.  With the Light selected in the Outliner, go down to the Constraints tab in the Properties panel (the icon looks like a couple of wheels with a band around them).  From the "Add Object Constraint" dropdown, choose "Track To" from the "Tracking" list.</p>
+
+    <img src=".\images\image110.webp">
+
+    <p>Click the square next to the word "Target" and choose your Plain Axes from the list.</p>
+
+    <img src=".\images\image111.webp">
+
+    <p>Now your area light will "tilt" to wherever those empty coordinates are located.  Now comes the fun part, and that's actually moving things around.  You can move the objects around with the mouse or keyboard.  I find the keyboard simpler.  We'll start with the target coordinates.  With the Plain Axes selected in the Outliner, click on the "Item" entry on the sidebar of the Viewport.  That will open up a "Transform" menu.  From there, you can position the target's coordinates.  Keep in mind that X is along the red axis (the first base line), Y is along the green axis (third-base line) Z is its height.  For this, I will be placing the target in more-or-less straight center field, so X and Y are both 60m, and Z is still at 0 because we want this light pointing at the ground.  You will notice a small orange dot moving around indicating the target.</p>
+
+    <img src=".\images\image112.webp">
+
+    <p>I will now repeat this process with the Area Light.  I will put this light directy over the target, and set it 45m in the air.  You'll see the "light" floating in space with a line pointing at where the target is.</p>
+
+    <img src=".\images\image113.webp">
+
+    <p>Then the next step is actually lighting it up.  With the Light selected, go down to the Data tab in the Properties panel (it's the icon that looks like a green light bulb).  From there you can adjust the light.  Pay particular attention to the Power, Shape, Size, and Spread options.  It's a good idea to turn off or hide other light sources while you get your area light set up and then adjust it later.</p>
+
+    <ul>
+      <li><b>Power</b> - should be self-explanatory, this is the actual brightness of the light source.</li>
+      <li><b>Shape</b> - the shape of the source - think like a square overhead light or a round lamp or what have you.  You have a few options, although I tend to stick with Disk or Ellipse as those seem to provide the "softest" fills.</li>
+      <li><b>Size</b> - this is how big the light is.  The larger the size, the more diffuse the light will be.</li>
+      <li><b>Spread</b> - this is a modifier that determines the spread of the light.  The larger the value, the more area will be covered and the more diffuse the light will be.  A narrow value creates a narrower beam of light.</li>
+    </ul>
+
+    <img src=".\images\image114.webp">
+
+    <h3>Snapping a light to a practical source</h3>
+    
+    <p>For more fine-grained directional lighting, you can also snap Lights to surfaces instead of using the general Emitters we set up earlier.  While this is more complicated, it can create somewhat more realistic looking lighting.  In Object mode, choose your "source" object, go into Edit mode, and select the face you want the light to snap to.  Then press Shift-S and choose "Cursor to Selected."</p>
+
+    <img src=".\images\image115.webp">
+
+    <p>Then add an Area light as we did before.  Instead of appearing at home plate, it will appear in the center of the surface you chose earlier.</p>
+
+    <img src=".\images\image116.webp">
+
+    <p>Then you can add a Plain Axes like before, and position it wherever you want.  Again, I am going to position it in center field.  Then you can track the light to the Plain Axes as before.  Then you can adjust the lighting as you see fit.</p>
+
+    <img src=".\images\image117.webp">
+
+    <p>Generally, basic emitters are probably going to be good enough and certainly simpler, but this is another option.  I am far from an expert on this lighting setup, so my documentation here is fairly sparse.  I'd encourage you to just play around with it.</p>
 
     <h1 id="section8">Troubleshooting / FAQ</h1>
     <p class="question">As I go through the components, sometimes the materials already seem to have UV Maps and bake images assigned to them and have some things highlighted in red, why?</p>
